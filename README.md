@@ -1,0 +1,119 @@
+# @hku/n8n-nodes-cosmos
+
+This is an n8n community node for Azure Cosmos DB. It provides **complete SQL query freedom** using the official Azure Cosmos DB SDK, enabling advanced features like **hybrid search** and **vector similarity search**.
+
+## Why Use This Node?
+
+Unlike the native n8n Cosmos DB node, this implementation:
+
+- ✅ **Uses Azure Cosmos DB SDK** (not REST API) for full feature support
+- ✅ **Complete query freedom** - write any SQL query including hybrid search
+- ✅ **Vector similarity search** - supports `VectorDistance()` and hybrid search queries
+- ✅ **Vector field exclusion** - optionally exclude large embedding fields to reduce payload
+- ✅ **Modern SDK features** - access to latest Cosmos DB capabilities
+
+Azure Cosmos DB is a fully managed NoSQL and relational database for modern app development with vector database support.
+
+[n8n](https://n8n.io/) is a [fair-code licensed](https://docs.n8n.io/sustainable-use-license/) workflow automation platform.
+
+- [Installation](#installation)
+- [Operations](#operations)
+- [Credentials](#credentials)
+- [Compatibility](#compatibility)
+- [Usage](#usage)
+- [Resources](#resources)
+
+## Installation
+
+Follow the [installation guide](https://docs.n8n.io/integrations/community-nodes/installation/) in the n8n community nodes documentation.
+
+### Development
+
+```bash
+# Install dependencies
+npm install
+
+# Build the node
+npm run build
+
+# Run in development mode
+npm run dev
+```
+
+## Operations
+
+This node supports **full SQL query capabilities** against Azure Cosmos DB containers:
+
+- **Any SQL Query**: Complete freedom to write any Cosmos DB SQL query
+- **Hybrid Search**: Combine vector similarity search with traditional filters
+- **Vector Similarity**: Use `VectorDistance()` function for semantic search
+- **Vector Field Exclusion**: Option to exclude vector/embedding fields from results to reduce payload size
+
+### Example Queries
+
+**Basic Query:**
+```sql
+SELECT * FROM c WHERE c.status = "active"
+```
+
+**Vector Similarity Search:**
+```sql
+SELECT TOP 10 c.id, c.title, VectorDistance(c.embedding, [0.1, 0.2, ...]) AS similarity
+FROM c
+ORDER BY VectorDistance(c.embedding, [0.1, 0.2, ...])
+```
+
+**Hybrid Search (Vector + Filters):**
+```sql
+SELECT TOP 10 c.id, c.title, VectorDistance(c.embedding, [0.1, 0.2, ...]) AS similarity
+FROM c
+WHERE c.category = "research" AND c.year >= 2023
+ORDER BY VectorDistance(c.embedding, [0.1, 0.2, ...])
+```
+
+## Credentials
+
+To use this node, you need:
+
+1. **Azure Cosmos DB Account**: Sign up at [Azure Portal](https://portal.azure.com/)
+2. **Endpoint URL**: Your Cosmos DB account endpoint (e.g., `https://your-account.documents.azure.com:443/`)
+3. **Access Key**: Primary or secondary key from Azure Portal → Your Cosmos DB Account → Keys
+
+### Authentication
+
+The node uses the **Azure Cosmos DB SDK** (`@azure/cosmos`) for authentication and queries. The credential test uses **HMAC-SHA256 signature authentication** with master keys to verify your connection by listing databases.
+
+## Compatibility
+
+- **Minimum n8n version**: 1.0.0
+- **Node.js version**: >=20.0.0
+- **Azure Cosmos DB SDK**: @azure/cosmos ^4.2.1
+
+## Usage
+
+### Basic Query
+
+1. Add the **HKU Cosmos DB** node to your workflow
+2. Select or create credentials with your Cosmos DB endpoint and access key
+3. Enter:
+   - **Database Name**: Your Cosmos DB database name
+   - **Container Name**: Your container name
+   - **SQL Query**: Your SQL query (e.g., `SELECT * FROM c WHERE c.status = "active"`)
+
+### Excluding Vector Fields
+
+When working with vector embeddings, you can reduce payload size:
+
+1. Expand the **Options** section
+2. Enable **Exclude Vector Fields**
+3. Optionally customize **Vector Field Names** (default: `vector,embedding,embeddings`)
+
+This is useful when vector data isn't needed in downstream nodes.
+
+## Resources
+
+- [n8n community nodes documentation](https://docs.n8n.io/integrations/#community-nodes)
+- [Azure Cosmos DB documentation](https://docs.microsoft.com/en-us/azure/cosmos-db/)
+- [Cosmos DB SQL query reference](https://docs.microsoft.com/en-us/azure/cosmos-db/sql-query-getting-started)
+- [Vector search in Cosmos DB](https://learn.microsoft.com/en-us/azure/cosmos-db/nosql/vector-search)
+- [Azure Cosmos DB SDK for JavaScript](https://github.com/Azure/azure-sdk-for-js/tree/main/sdk/cosmosdb/cosmos)

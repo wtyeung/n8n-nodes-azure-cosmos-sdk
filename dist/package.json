@@ -1,0 +1,58 @@
+{
+    "name": "@hku/n8n-nodes-cosmos",
+    "version": "0.1.0",
+    "description": "n8n node for Azure Cosmos DB with hybrid search and vector similarity support",
+    "license": "MIT",
+    "homepage": "https://github.com/hku-official/n8n-nodes-cosmos-db",
+    "keywords": [
+        "n8n-community-node-package"
+    ],
+    "author": {
+        "name": "Tim Yeung",
+        "email": "tim.yeung@hku.hk"
+    },
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/hku-official/n8n-nodes-cosmos-db.git"
+    },
+    "scripts": {
+        "build": "n8n-node build",
+        "postbuild": "npm run link:dev",
+        "build:watch": "tsc --watch",
+        "dev": "n8n-node dev",
+        "link:dev": "npm install --prefix ~/.n8n-node-cli/.n8n/nodes \"$npm_package_name@file:$PWD\"",
+        "lint": "n8n-node lint",
+        "lint:fix": "n8n-node lint --fix",
+        "release": "n8n-node release",
+        "prepublishOnly": "n8n-node prerelease"
+    },
+    "files": [
+        "dist"
+    ],
+    "n8n": {
+        "n8nNodesApiVersion": 1,
+        "credentials": [
+            "dist/credentials/CosmosDb.credentials.js"
+        ],
+        "nodes": [
+            "dist/nodes/Cosmos/Cosmos.node.js"
+        ]
+    },
+    "engines": {
+        "node": ">=20.0.0"
+    },
+    "dependencies": {
+        "@azure/cosmos": "^4.2.1"
+    },
+    "devDependencies": {
+        "@n8n/node-cli": "*",
+        "@types/node": "^24.7.0",
+        "eslint": "9.32.0",
+        "prettier": "3.6.2",
+        "release-it": "^19.0.4",
+        "typescript": "5.9.2"
+    },
+    "peerDependencies": {
+        "n8n-workflow": "*"
+    }
+}
