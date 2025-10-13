@@ -7,6 +7,7 @@ on:
     branches: [ main ]
 
 env:
+  AZURE_STORAGE_ACCOUNT: hkun8nstorage
   AZURE_FILE_SHARE_NAME: n8n-nodes
   AZURE_DESTINATION_PATH: n8nCustom/@hku/n8n-nodes-cosmos
 
@@ -44,7 +45,7 @@ jobs:
         with:
           inlineScript: |
             az storage file upload-batch \
-              --account-name ${{ secrets.AZURE_STORAGE_ACCOUNT }} \
+              --account-name ${{ env.AZURE_STORAGE_ACCOUNT }} \
               --account-key ${{ secrets.AZURE_STORAGE_KEY }} \
               --destination ${{ env.AZURE_FILE_SHARE_NAME }} \
               --source ./deploy-package \
