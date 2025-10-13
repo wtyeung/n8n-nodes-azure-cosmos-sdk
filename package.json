@@ -32,7 +32,7 @@
     "n8n": {
         "n8nNodesApiVersion": 1,
         "credentials": [
-            "dist/credentials/CosmosDb.credentials.js"
+            "dist/credentials/CosmosDbApi.credentials.js"
         ],
         "nodes": [
             "dist/nodes/Cosmos/Cosmos.node.js"

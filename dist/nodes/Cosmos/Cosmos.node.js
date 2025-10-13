@@ -21,7 +21,7 @@ class Cosmos {
             usableAsTool: true,
             credentials: [
                 {
-                    name: 'cosmosDb',
+                    name: 'cosmosDbApi',
                     required: true,
                 },
             ],
@@ -88,7 +88,7 @@ class Cosmos {
                     type: 'json',
                     default: '{}',
                     required: true,
-                    placeholder: '{"id": "1", "name": "Example"}',
+                    placeholder: '{"ID": "1", "name": "Example"}',
                     description: 'The document to insert as JSON',
                     displayOptions: {
                         show: {
@@ -136,7 +136,7 @@ class Cosmos {
     async execute() {
         const items = this.getInputData();
         const returnData = [];
-        const credentials = await this.getCredentials('cosmosDb');
+        const credentials = await this.getCredentials('cosmosDbApi');
         const endpoint = credentials.endpoint;
         const key = credentials.key;
         const client = new cosmos_1.CosmosClient({ endpoint, key });

@@ -24,7 +24,7 @@ export class Cosmos implements INodeType {
 		usableAsTool: true,
 		credentials: [
 			{
-				name: 'cosmosDb',
+				name: 'cosmosDbApi',
 				required: true,
 			},
 		],
@@ -91,7 +91,7 @@ export class Cosmos implements INodeType {
 				type: 'json',
 				default: '{}',
 				required: true,
-				placeholder: '{"id": "1", "name": "Example"}',
+				placeholder: '{"ID": "1", "name": "Example"}',
 				description: 'The document to insert as JSON',
 				displayOptions: {
 					show: {
@@ -141,7 +141,7 @@ export class Cosmos implements INodeType {
 		const returnData: INodeExecutionData[] = [];
 
 		// Get credentials
-		const credentials = await this.getCredentials('cosmosDb');
+		const credentials = await this.getCredentials('cosmosDbApi');
 		const endpoint = credentials.endpoint as string;
 		const key = credentials.key as string;
 

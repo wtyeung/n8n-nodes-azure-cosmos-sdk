@@ -1,11 +1,11 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.CosmosDb = void 0;
+exports.CosmosDbApi = void 0;
 const crypto_1 = require("crypto");
-class CosmosDb {
+class CosmosDbApi {
     constructor() {
-        this.name = 'cosmosDb';
-        this.displayName = 'HKU Cosmos DB';
+        this.name = 'cosmosDbApi';
+        this.displayName = 'HKU Cosmos DB API';
         this.documentationUrl = 'https://docs.microsoft.com/en-us/azure/cosmos-db/';
         this.properties = [
             {
@@ -57,5 +57,5 @@ class CosmosDb {
         return requestOptions;
     }
 }
-exports.CosmosDb = CosmosDb;
-//# sourceMappingURL=CosmosDb.credentials.js.map
+exports.CosmosDbApi = CosmosDbApi;
+//# sourceMappingURL=CosmosDbApi.credentials.js.map
