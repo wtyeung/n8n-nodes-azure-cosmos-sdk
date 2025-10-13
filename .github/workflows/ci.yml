@@ -2,14 +2,9 @@ name: CI/CD
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, develop ]
   pull_request:
-    branches: [ main ]
-
-env:
-  AZURE_STORAGE_ACCOUNT: sticdevitsplayn8ndev
-  AZURE_FILE_SHARE_NAME: fs-n8ndev
-  AZURE_DESTINATION_PATH: n8nCustom/@hku/n8n-nodes-cosmos
+    branches: [ main, develop ]
 
 jobs:
   build-and-deploy:
@@ -31,8 +26,24 @@ jobs:
       - name: Run build
         run: 'npm run build'
 
-      - name: Create deployment package
+      - name: Set deployment variables (Test)
+        if: github.ref == 'refs/heads/develop'
+        run: |
+          echo "AZURE_STORAGE_ACCOUNT=sticdevitsplayn8ndev" >> $GITHUB_ENV
+          echo "AZURE_STORAGE_KEY=${{ secrets.AZURE_STORAGE_KEY_TEST }}" >> $GITHUB_ENV
+          echo "AZURE_FILE_SHARE_NAME=fs-n8ndev" >> $GITHUB_ENV
+          echo "AZURE_DESTINATION_PATH=n8nCustom/@hku/n8n-nodes-cosmos" >> $GITHUB_ENV
+
+      - name: Set deployment variables (Production)
         if: github.ref == 'refs/heads/main'
+        run: |
+          echo "AZURE_STORAGE_ACCOUNT=blobtimyeungtest" >> $GITHUB_ENV
+          echo "AZURE_STORAGE_KEY=${{ secrets.AZURE_STORAGE_KEY_PROD }}" >> $GITHUB_ENV
+          echo "AZURE_FILE_SHARE_NAME=n8n-dev-custom" >> $GITHUB_ENV
+          echo "AZURE_DESTINATION_PATH=n8nCustom/@hku/n8n-nodes-cosmos" >> $GITHUB_ENV
+
+      - name: Create deployment package
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'
         run: |
           mkdir -p deploy-package
           cp -r dist deploy-package/
@@ -40,13 +51,13 @@ jobs:
           cp package-lock.json deploy-package/
 
       - name: Upload to Azure File Share
-        if: github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'
         uses: azure/CLI@v1
         with:
           inlineScript: |
             az storage file upload-batch \
               --account-name ${{ env.AZURE_STORAGE_ACCOUNT }} \
-              --account-key ${{ secrets.AZURE_STORAGE_KEY }} \
+              --account-key ${{ env.AZURE_STORAGE_KEY }} \
               --destination ${{ env.AZURE_FILE_SHARE_NAME }} \
               --source ./deploy-package \
               --destination-path ${{ env.AZURE_DESTINATION_PATH }} \
