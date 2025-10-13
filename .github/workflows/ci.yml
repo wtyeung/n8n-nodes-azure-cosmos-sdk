@@ -7,8 +7,8 @@ on:
     branches: [ main ]
 
 env:
-  AZURE_STORAGE_ACCOUNT: hkun8nstorage
-  AZURE_FILE_SHARE_NAME: n8n-nodes
+  AZURE_STORAGE_ACCOUNT: sticdevitsplayn8ndev
+  AZURE_FILE_SHARE_NAME: fs-n8ndev
   AZURE_DESTINATION_PATH: n8nCustom/@hku/n8n-nodes-cosmos
 
 jobs:
