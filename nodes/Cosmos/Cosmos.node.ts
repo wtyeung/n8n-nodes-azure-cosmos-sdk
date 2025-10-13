@@ -299,6 +299,12 @@ export class Cosmos implements INodeType {
 						// Insert the document
 						const { resource } = await container.items.create(document);
 
+						if (!resource) {
+							throw new NodeOperationError(this.getNode(), 'Insert operation did not return a resource', {
+								itemIndex,
+							});
+						}
+
 						returnData.push({
 							json: resource,
 							pairedItem: itemIndex,

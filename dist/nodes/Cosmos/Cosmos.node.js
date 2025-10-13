@@ -268,6 +268,11 @@ class Cosmos {
                     }
                     try {
                         const { resource } = await container.items.create(document);
+                        if (!resource) {
+                            throw new n8n_workflow_1.NodeOperationError(this.getNode(), 'Insert operation did not return a resource', {
+                                itemIndex,
+                            });
+                        }
                         returnData.push({
                             json: resource,
                             pairedItem: itemIndex,
