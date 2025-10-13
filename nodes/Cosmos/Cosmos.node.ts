@@ -48,9 +48,9 @@ export class Cosmos implements INodeType {
 						action: 'Insert a document',
 					},
 					{
-						name: 'Upsert',
+						name: 'Create or Update',
 						value: 'upsert',
-						description: 'Insert or update a document (creates if not exists, replaces if exists)',
+						description: 'Create a new record, or update the current one if it already exists (upsert)',
 						action: 'Upsert a document',
 					},
 					{
@@ -160,7 +160,7 @@ export class Cosmos implements INodeType {
 				default: 'SELECT * FROM c WHERE c.status = "inactive"',
 				required: true,
 				placeholder: 'SELECT * FROM c WHERE c.createdAt < "2024-01-01"',
-				description: 'SQL query to select documents to delete. Use SELECT * to include all fields needed for deletion (id and partition key).',
+				description: 'SQL query to select documents to delete. Use SELECT * to include all fields needed for deletion (ID and partition key).',
 				displayOptions: {
 					show: {
 						operation: ['delete'],
@@ -174,8 +174,8 @@ export class Cosmos implements INodeType {
 				type: 'json',
 				default: '{}',
 				required: true,
-				placeholder: '{"id": "123", "name": "Example"}',
-				description: 'The document to insert as JSON. Must include an "id" field.',
+				placeholder: '{"ID": "123", "name": "Example"}',
+				description: 'The document to insert as JSON. Must include an ID field.',
 				displayOptions: {
 					show: {
 						operation: ['insert', 'upsert'],
@@ -273,35 +273,44 @@ export class Cosmos implements INodeType {
 						});
 					}
 				} else if (operation === 'insert') {
-					// INSERT operation
-					const documentJson = this.getNodeParameter('document', itemIndex) as string;
-					const document = typeof documentJson === 'string' ? JSON.parse(documentJson) : documentJson;
+				// INSERT operation
+				const documentJson = this.getNodeParameter('document', itemIndex) as string;
+				const document = typeof documentJson === 'string' ? JSON.parse(documentJson) : documentJson;
 
-					if (!document.id) {
-						throw new Error('Document must include an "id" field');
-					}
+				if (!document.id) {
+					throw new NodeOperationError(this.getNode(), 'Document must include an ID field', {
+						itemIndex,
+					});
+				}
 
-					try {
-						// Insert the document
-						const { resource } = await container.items.create(document);
+				try {
+					// Insert the document
+					const { resource } = await container.items.create(document);
 
-						returnData.push({
-							json: resource,
-							pairedItem: itemIndex,
+					returnData.push({
+						json: resource,
+						pairedItem: itemIndex,
+					});
+				} catch (error) {
+					const cosmosError = error as { code?: number };
+					if (cosmosError.code === 409) {
+						throw new NodeOperationError(this.getNode(), `Document with ID '${document.id}' already exists. Use Create or Update operation to update existing documents.`, {
+							itemIndex,
 						});
-					} catch (error: any) {
-						if (error.code === 409) {
-							throw new Error(`Document with ID '${document.id}' already exists. Use Upsert operation to update existing documents.`);
-						}
-						throw error;
 					}
+					throw new NodeOperationError(this.getNode(), error as Error, {
+						itemIndex,
+					});
+				}
 				} else if (operation === 'upsert') {
 					// UPSERT operation
 					const documentJson = this.getNodeParameter('document', itemIndex) as string;
 					const document = typeof documentJson === 'string' ? JSON.parse(documentJson) : documentJson;
 
 					if (!document.id) {
-						throw new Error('Document must include an "id" field');
+						throw new NodeOperationError(this.getNode(), 'Document must include an ID field', {
+							itemIndex,
+						});
 					}
 
 					// Upsert the document (create or replace)
@@ -333,11 +342,16 @@ export class Cosmos implements INodeType {
 								},
 								pairedItem: itemIndex,
 							});
-						} catch (error: any) {
-							if (error.code === 404) {
-								throw new Error(`Document with ID '${documentId}' and partition key '${partitionKeyValue}' not found`);
+						} catch (error) {
+							const cosmosError = error as { code?: number };
+							if (cosmosError.code === 404) {
+								throw new NodeOperationError(this.getNode(), `Document with ID '${documentId}' and partition key '${partitionKeyValue}' not found`, {
+									itemIndex,
+								});
 							}
-							throw error;
+							throw new NodeOperationError(this.getNode(), error as Error, {
+								itemIndex,
+							});
 						}
 					} else {
 						// Delete by query
@@ -355,10 +369,11 @@ export class Cosmos implements INodeType {
 						const partitionKeyPath = containerDef.resource?.partitionKey?.paths?.[0]?.replace('/', '') || 'id';
 
 						// Check if query includes partition key field
-						if (resources.length > 0 && !resources[0].hasOwnProperty(partitionKeyPath)) {
-							throw new Error(
+						if (resources.length > 0 && !Object.prototype.hasOwnProperty.call(resources[0], partitionKeyPath)) {
+							throw new NodeOperationError(this.getNode(),
 								`Query must include the partition key field '${partitionKeyPath}'. ` +
-								`Use: SELECT * FROM c WHERE ... or SELECT c.id, c.${partitionKeyPath} FROM c WHERE ...`
+								`Use: SELECT * FROM c WHERE ... or SELECT c.id, c.${partitionKeyPath} FROM c WHERE ...`,
+								{ itemIndex }
 							);
 						}
 
@@ -384,10 +399,11 @@ export class Cosmos implements INodeType {
 								await container.item(resource.id, partitionKeyValue).delete();
 								deletedCount++;
 								deletedIds.push(resource.id);
-							} catch (error: any) {
+							} catch (error) {
+								const err = error as Error;
 								errors.push({
 									id: resource.id,
-									error: error.message || String(error)
+									error: err.message || String(error)
 								});
 							}
 						}

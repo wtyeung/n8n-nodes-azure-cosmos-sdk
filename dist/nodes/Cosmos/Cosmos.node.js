@@ -45,9 +45,9 @@ class Cosmos {
                             action: 'Insert a document',
                         },
                         {
-                            name: 'Upsert',
+                            name: 'Create or Update',
                             value: 'upsert',
-                            description: 'Insert or update a document (creates if not exists, replaces if exists)',
+                            description: 'Create a new record, or update the current one if it already exists (upsert)',
                             action: 'Upsert a document',
                         },
                         {
@@ -157,7 +157,7 @@ class Cosmos {
                     default: 'SELECT * FROM c WHERE c.status = "inactive"',
                     required: true,
                     placeholder: 'SELECT * FROM c WHERE c.createdAt < "2024-01-01"',
-                    description: 'SQL query to select documents to delete. Use SELECT * to include all fields needed for deletion (id and partition key).',
+                    description: 'SQL query to select documents to delete. Use SELECT * to include all fields needed for deletion (ID and partition key).',
                     displayOptions: {
                         show: {
                             operation: ['delete'],
@@ -171,8 +171,8 @@ class Cosmos {
                     type: 'json',
                     default: '{}',
                     required: true,
-                    placeholder: '{"id": "123", "name": "Example"}',
-                    description: 'The document to insert as JSON. Must include an "id" field.',
+                    placeholder: '{"ID": "123", "name": "Example"}',
+                    description: 'The document to insert as JSON. Must include an ID field.',
                     displayOptions: {
                         show: {
                             operation: ['insert', 'upsert'],
@@ -257,7 +257,9 @@ class Cosmos {
                     const documentJson = this.getNodeParameter('document', itemIndex);
                     const document = typeof documentJson === 'string' ? JSON.parse(documentJson) : documentJson;
                     if (!document.id) {
-                        throw new Error('Document must include an "id" field');
+                        throw new n8n_workflow_1.NodeOperationError(this.getNode(), 'Document must include an ID field', {
+                            itemIndex,
+                        });
                     }
                     try {
                         const { resource } = await container.items.create(document);
@@ -267,17 +269,24 @@ class Cosmos {
                         });
                     }
                     catch (error) {
-                        if (error.code === 409) {
-                            throw new Error(`Document with ID '${document.id}' already exists. Use Upsert operation to update existing documents.`);
+                        const cosmosError = error;
+                        if (cosmosError.code === 409) {
+                            throw new n8n_workflow_1.NodeOperationError(this.getNode(), `Document with ID '${document.id}' already exists. Use Create or Update operation to update existing documents.`, {
+                                itemIndex,
+                            });
                         }
-                        throw error;
+                        throw new n8n_workflow_1.NodeOperationError(this.getNode(), error, {
+                            itemIndex,
+                        });
                     }
                 }
                 else if (operation === 'upsert') {
                     const documentJson = this.getNodeParameter('document', itemIndex);
                     const document = typeof documentJson === 'string' ? JSON.parse(documentJson) : documentJson;
                     if (!document.id) {
-                        throw new Error('Document must include an "id" field');
+                        throw new n8n_workflow_1.NodeOperationError(this.getNode(), 'Document must include an ID field', {
+                            itemIndex,
+                        });
                     }
                     const { resource } = await container.items.upsert(document);
                     returnData.push({
@@ -304,10 +313,15 @@ class Cosmos {
                             });
                         }
                         catch (error) {
-                            if (error.code === 404) {
-                                throw new Error(`Document with ID '${documentId}' and partition key '${partitionKeyValue}' not found`);
+                            const cosmosError = error;
+                            if (cosmosError.code === 404) {
+                                throw new n8n_workflow_1.NodeOperationError(this.getNode(), `Document with ID '${documentId}' and partition key '${partitionKeyValue}' not found`, {
+                                    itemIndex,
+                                });
                             }
-                            throw error;
+                            throw new n8n_workflow_1.NodeOperationError(this.getNode(), error, {
+                                itemIndex,
+                            });
                         }
                     }
                     else {
@@ -318,9 +332,9 @@ class Cosmos {
                         const errors = [];
                         const containerDef = await container.read();
                         const partitionKeyPath = ((_d = (_c = (_b = (_a = containerDef.resource) === null || _a === void 0 ? void 0 : _a.partitionKey) === null || _b === void 0 ? void 0 : _b.paths) === null || _c === void 0 ? void 0 : _c[0]) === null || _d === void 0 ? void 0 : _d.replace('/', '')) || 'id';
-                        if (resources.length > 0 && !resources[0].hasOwnProperty(partitionKeyPath)) {
-                            throw new Error(`Query must include the partition key field '${partitionKeyPath}'. ` +
-                                `Use: SELECT * FROM c WHERE ... or SELECT c.id, c.${partitionKeyPath} FROM c WHERE ...`);
+                        if (resources.length > 0 && !Object.prototype.hasOwnProperty.call(resources[0], partitionKeyPath)) {
+                            throw new n8n_workflow_1.NodeOperationError(this.getNode(), `Query must include the partition key field '${partitionKeyPath}'. ` +
+                                `Use: SELECT * FROM c WHERE ... or SELECT c.id, c.${partitionKeyPath} FROM c WHERE ...`, { itemIndex });
                         }
                         for (const resource of resources) {
                             if (!resource.id) {
@@ -341,9 +355,10 @@ class Cosmos {
                                 deletedIds.push(resource.id);
                             }
                             catch (error) {
+                                const err = error;
                                 errors.push({
                                     id: resource.id,
-                                    error: error.message || String(error)
+                                    error: err.message || String(error)
                                 });
                             }
                         }
