@@ -1,20 +1,23 @@
-name: CI
+name: CI/CD
 
 on:
-  pull_request:
   push:
-    branches:
-      - main
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  AZURE_FILE_SHARE_NAME: n8n-nodes
+  AZURE_DESTINATION_PATH: n8nCustom/@hku/n8n-nodes-cosmos
 
 jobs:
-  build:
+  build-and-deploy:
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
-
-      - name: Use Node.js
-        uses: actions/setup-node@v4
+      
+      - uses: actions/setup-node@v4
         with:
           node-version: '22'
 
@@ -43,7 +46,7 @@ jobs:
             az storage file upload-batch \
               --account-name ${{ secrets.AZURE_STORAGE_ACCOUNT }} \
               --account-key ${{ secrets.AZURE_STORAGE_KEY }} \
-              --destination ${{ secrets.AZURE_FILE_SHARE_NAME }} \
+              --destination ${{ env.AZURE_FILE_SHARE_NAME }} \
               --source ./deploy-package \
-              --destination-path ${{ secrets.AZURE_DESTINATION_PATH }} \
+              --destination-path ${{ env.AZURE_DESTINATION_PATH }} \
               --no-progress
