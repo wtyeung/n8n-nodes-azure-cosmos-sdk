@@ -42,33 +42,55 @@ npm run dev
 
 ## Operations
 
-This node supports **full SQL query capabilities** against Azure Cosmos DB containers:
+This node supports multiple operations against Azure Cosmos DB containers:
 
-- **Any SQL Query**: Complete freedom to write any Cosmos DB SQL query
+### Select (Query Documents)
+
+Execute **full SQL queries** with complete freedom:
+
+- **Any SQL Query**: Write any Cosmos DB SQL query
 - **Hybrid Search**: Combine vector similarity search with traditional filters
 - **Vector Similarity**: Use `VectorDistance()` function for semantic search
 - **Vector Field Exclusion**: Option to exclude vector/embedding fields from results to reduce payload size
 
-### Example Queries
+**Example Queries:**
 
-**Basic Query:**
+Basic Query:
 ```sql
 SELECT * FROM c WHERE c.status = "active"
 ```
 
-**Vector Similarity Search:**
+Vector Similarity Search:
 ```sql
 SELECT TOP 10 c.id, c.title, VectorDistance(c.embedding, [0.1, 0.2, ...]) AS similarity
 FROM c
 ORDER BY VectorDistance(c.embedding, [0.1, 0.2, ...])
 ```
 
-**Hybrid Search (Vector + Filters):**
+Hybrid Search (Vector + Filters):
 ```sql
 SELECT TOP 10 c.id, c.title, VectorDistance(c.embedding, [0.1, 0.2, ...]) AS similarity
 FROM c
 WHERE c.category = "research" AND c.year >= 2023
 ORDER BY VectorDistance(c.embedding, [0.1, 0.2, ...])
+```
+
+### Insert (Create Document)
+
+Insert new documents into a container:
+
+- **JSON Input**: Provide document as JSON
+- **Auto-generated Metadata**: Returns document with Cosmos DB metadata (`_rid`, `_self`, `_etag`, etc.)
+- **Partition Key Support**: Automatically handles partition keys
+
+**Example:**
+```json
+{
+  "id": "unique-id-123",
+  "name": "John Doe",
+  "email": "john@example.com",
+  "status": "active"
+}
 ```
 
 ## Credentials
@@ -91,16 +113,17 @@ The node uses the **Azure Cosmos DB SDK** (`@azure/cosmos`) for authentication a
 
 ## Usage
 
-### Basic Query
+### Select Operation
 
 1. Add the **HKU Cosmos DB** node to your workflow
 2. Select or create credentials with your Cosmos DB endpoint and access key
-3. Enter:
+3. Choose **Select** operation
+4. Enter:
    - **Database Name**: Your Cosmos DB database name
    - **Container Name**: Your container name
    - **SQL Query**: Your SQL query (e.g., `SELECT * FROM c WHERE c.status = "active"`)
 
-### Excluding Vector Fields
+**Excluding Vector Fields:**
 
 When working with vector embeddings, you can reduce payload size:
 
@@ -109,6 +132,21 @@ When working with vector embeddings, you can reduce payload size:
 3. Optionally customize **Vector Field Names** (default: `vector,embedding,embeddings`)
 
 This is useful when vector data isn't needed in downstream nodes.
+
+### Insert Operation
+
+1. Add the **HKU Cosmos DB** node to your workflow
+2. Select or create credentials
+3. Choose **Insert** operation
+4. Enter:
+   - **Database Name**: Your Cosmos DB database name
+   - **Container Name**: Your container name
+   - **Document**: JSON document to insert
+
+**Tips:**
+- The `id` field is required and must be unique
+- Partition key must be included if your container uses one
+- You can use expressions to dynamically generate documents from previous nodes
 
 ## Resources
 

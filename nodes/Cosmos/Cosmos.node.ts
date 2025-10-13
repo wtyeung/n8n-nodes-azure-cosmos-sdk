@@ -30,6 +30,27 @@ export class Cosmos implements INodeType {
 		],
 		properties: [
 			{
+				displayName: 'Operation',
+				name: 'operation',
+				type: 'options',
+				noDataExpression: true,
+				options: [
+					{
+						name: 'Select',
+						value: 'select',
+						description: 'Query documents using SQL',
+						action: 'Query documents',
+					},
+					{
+						name: 'Insert',
+						value: 'insert',
+						description: 'Insert a new document',
+						action: 'Insert a document',
+					},
+				],
+				default: 'select',
+			},
+			{
 				displayName: 'Database Name',
 				name: 'databaseName',
 				type: 'string',
@@ -58,6 +79,25 @@ export class Cosmos implements INodeType {
 				required: true,
 				placeholder: 'SELECT * FROM c WHERE c.status = "active"',
 				description: 'The SQL query to execute against the container',
+				displayOptions: {
+					show: {
+						operation: ['select'],
+					},
+				},
+			},
+			{
+				displayName: 'Document',
+				name: 'document',
+				type: 'json',
+				default: '{}',
+				required: true,
+				placeholder: '{"id": "1", "name": "Example"}',
+				description: 'The document to insert as JSON',
+				displayOptions: {
+					show: {
+						operation: ['insert'],
+					},
+				},
 			},
 			{
 				displayName: 'Options',
@@ -65,6 +105,11 @@ export class Cosmos implements INodeType {
 				type: 'collection',
 				placeholder: 'Add Option',
 				default: {},
+				displayOptions: {
+					show: {
+						operation: ['select'],
+					},
+				},
 				options: [
 					{
 						displayName: 'Exclude Vector Fields',
@@ -104,39 +149,56 @@ export class Cosmos implements INodeType {
 
 		for (let itemIndex = 0; itemIndex < items.length; itemIndex++) {
 			try {
+				const operation = this.getNodeParameter('operation', itemIndex) as string;
 				const databaseName = this.getNodeParameter('databaseName', itemIndex) as string;
 				const containerName = this.getNodeParameter('containerName', itemIndex) as string;
-				const sqlQuery = this.getNodeParameter('sqlQuery', itemIndex) as string;
-				const options = this.getNodeParameter('options', itemIndex, {}) as {
-					excludeVectorFields?: boolean;
-					vectorFieldNames?: string;
-				};
 
 				const database = client.database(databaseName);
 				const container = database.container(containerName);
 
-				// Execute the SQL query
-				const { resources } = await container.items.query(sqlQuery).fetchAll();
+				if (operation === 'select') {
+					// SELECT operation
+					const sqlQuery = this.getNodeParameter('sqlQuery', itemIndex) as string;
+					const options = this.getNodeParameter('options', itemIndex, {}) as {
+						excludeVectorFields?: boolean;
+						vectorFieldNames?: string;
+					};
 
-				// Add each result as a separate item
-				for (const resource of resources) {
-					let processedResource = resource;
+					// Execute the SQL query
+					const { resources } = await container.items.query(sqlQuery).fetchAll();
 
-					// Remove vector fields if requested
-					if (options.excludeVectorFields) {
-						const vectorFields = (options.vectorFieldNames || 'vector,embedding,embeddings')
-							.split(',')
-							.map(f => f.trim())
-							.filter(f => f.length > 0);
+					// Add each result as a separate item
+					for (const resource of resources) {
+						let processedResource = resource;
 
-						processedResource = { ...resource };
-						for (const field of vectorFields) {
-							delete processedResource[field];
+						// Remove vector fields if requested
+						if (options.excludeVectorFields) {
+							const vectorFields = (options.vectorFieldNames || 'vector,embedding,embeddings')
+								.split(',')
+								.map(f => f.trim())
+								.filter(f => f.length > 0);
+
+							processedResource = { ...resource };
+							for (const field of vectorFields) {
+								delete processedResource[field];
+							}
 						}
+
+						returnData.push({
+							json: processedResource,
+							pairedItem: itemIndex,
+						});
 					}
+				} else if (operation === 'insert') {
+					// INSERT operation
+					const documentJson = this.getNodeParameter('document', itemIndex) as string;
+					const document = typeof documentJson === 'string' ? JSON.parse(documentJson) : documentJson;
+
+					// Insert the document
+					const { resource } = await container.items.create(document);
 
 					returnData.push({
-						json: processedResource,
+						json: resource,
 						pairedItem: itemIndex,
 					});
 				}
