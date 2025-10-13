@@ -217,7 +217,7 @@ class Cosmos {
         };
     }
     async execute() {
-        var _a, _b, _c, _d;
+        var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m;
         const items = this.getInputData();
         const returnData = [];
         const credentials = await this.getCredentials('cosmosDbApi');
@@ -261,6 +261,11 @@ class Cosmos {
                             itemIndex,
                         });
                     }
+                    const containerDef = await container.read();
+                    const partitionKeyPath = ((_d = (_c = (_b = (_a = containerDef.resource) === null || _a === void 0 ? void 0 : _a.partitionKey) === null || _b === void 0 ? void 0 : _b.paths) === null || _c === void 0 ? void 0 : _c[0]) === null || _d === void 0 ? void 0 : _d.replace('/', '')) || 'id';
+                    if (!Object.prototype.hasOwnProperty.call(document, partitionKeyPath)) {
+                        throw new n8n_workflow_1.NodeOperationError(this.getNode(), `Document must include the partition key field '${partitionKeyPath}'. Add this field to your document.`, { itemIndex });
+                    }
                     try {
                         const { resource } = await container.items.create(document);
                         returnData.push({
@@ -287,6 +292,11 @@ class Cosmos {
                         throw new n8n_workflow_1.NodeOperationError(this.getNode(), 'Document must include an ID field', {
                             itemIndex,
                         });
+                    }
+                    const containerDef = await container.read();
+                    const partitionKeyPath = ((_h = (_g = (_f = (_e = containerDef.resource) === null || _e === void 0 ? void 0 : _e.partitionKey) === null || _f === void 0 ? void 0 : _f.paths) === null || _g === void 0 ? void 0 : _g[0]) === null || _h === void 0 ? void 0 : _h.replace('/', '')) || 'id';
+                    if (!Object.prototype.hasOwnProperty.call(document, partitionKeyPath)) {
+                        throw new n8n_workflow_1.NodeOperationError(this.getNode(), `Document must include the partition key field '${partitionKeyPath}'. Add this field to your document.`, { itemIndex });
                     }
                     const { resource } = await container.items.upsert(document);
                     returnData.push({
@@ -331,7 +341,7 @@ class Cosmos {
                         const deletedIds = [];
                         const errors = [];
                         const containerDef = await container.read();
-                        const partitionKeyPath = ((_d = (_c = (_b = (_a = containerDef.resource) === null || _a === void 0 ? void 0 : _a.partitionKey) === null || _b === void 0 ? void 0 : _b.paths) === null || _c === void 0 ? void 0 : _c[0]) === null || _d === void 0 ? void 0 : _d.replace('/', '')) || 'id';
+                        const partitionKeyPath = ((_m = (_l = (_k = (_j = containerDef.resource) === null || _j === void 0 ? void 0 : _j.partitionKey) === null || _k === void 0 ? void 0 : _k.paths) === null || _l === void 0 ? void 0 : _l[0]) === null || _m === void 0 ? void 0 : _m.replace('/', '')) || 'id';
                         if (resources.length > 0 && !Object.prototype.hasOwnProperty.call(resources[0], partitionKeyPath)) {
                             throw new n8n_workflow_1.NodeOperationError(this.getNode(), `Query must include the partition key field '${partitionKeyPath}'. ` +
                                 `Use: SELECT * FROM c WHERE ... or SELECT c.id, c.${partitionKeyPath} FROM c WHERE ...`, { itemIndex });

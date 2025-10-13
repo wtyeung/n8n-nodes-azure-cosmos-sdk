@@ -283,6 +283,18 @@ export class Cosmos implements INodeType {
 						});
 					}
 
+					// Get container properties to determine partition key path
+					const containerDef = await container.read();
+					const partitionKeyPath = containerDef.resource?.partitionKey?.paths?.[0]?.replace('/', '') || 'id';
+
+					// Validate partition key field exists
+					if (!Object.prototype.hasOwnProperty.call(document, partitionKeyPath)) {
+						throw new NodeOperationError(this.getNode(),
+							`Document must include the partition key field '${partitionKeyPath}'. Add this field to your document.`,
+							{ itemIndex }
+						);
+					}
+
 					try {
 						// Insert the document
 						const { resource } = await container.items.create(document);
@@ -311,6 +323,18 @@ export class Cosmos implements INodeType {
 						throw new NodeOperationError(this.getNode(), 'Document must include an ID field', {
 							itemIndex,
 						});
+					}
+
+					// Get container properties to determine partition key path
+					const containerDef = await container.read();
+					const partitionKeyPath = containerDef.resource?.partitionKey?.paths?.[0]?.replace('/', '') || 'id';
+
+					// Validate partition key field exists
+					if (!Object.prototype.hasOwnProperty.call(document, partitionKeyPath)) {
+						throw new NodeOperationError(this.getNode(),
+							`Document must include the partition key field '${partitionKeyPath}'. Add this field to your document.`,
+							{ itemIndex }
+						);
 					}
 
 					// Upsert the document (create or replace)
