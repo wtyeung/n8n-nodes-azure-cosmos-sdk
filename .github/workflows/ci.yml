@@ -27,10 +27,6 @@ jobs:
       - name: Run build
         run: 'npm run build'
 
-      - name: Install production dependencies
-        if: github.ref == 'refs/heads/main'
-        run: npm ci --production
-
       - name: Create deployment package
         if: github.ref == 'refs/heads/main'
         run: |
@@ -38,7 +34,6 @@ jobs:
           cp -r dist deploy-package/
           cp package.json deploy-package/
           cp package-lock.json deploy-package/
-          cp -r node_modules deploy-package/
 
       - name: Upload to Azure File Share
         if: github.ref == 'refs/heads/main'

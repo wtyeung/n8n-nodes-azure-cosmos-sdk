@@ -41,9 +41,7 @@
     "engines": {
         "node": ">=20.0.0"
     },
-    "dependencies": {
-        "@azure/cosmos": "^4.2.1"
-    },
+    "dependencies": {},
     "devDependencies": {
         "@n8n/node-cli": "*",
         "@types/node": "^24.7.0",
@@ -53,6 +51,7 @@
         "typescript": "5.9.2"
     },
     "peerDependencies": {
+        "@azure/cosmos": "*",
         "n8n-workflow": "*"
     }
 }

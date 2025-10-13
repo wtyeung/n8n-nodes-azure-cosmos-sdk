@@ -136,6 +136,41 @@ npm install @hku/n8n-nodes-cosmos --registry http://localhost:4873
 
 ## Option 4: Docker (Self-Hosted n8n)
 
+### Using Azure File Share (Recommended for Production)
+
+This approach deploys files to Azure File Share via GitHub Actions, then Docker mounts and installs dependencies:
+
+1. **GitHub Actions deploys** (automatic on push to main):
+   - Uploads `dist/`, `package.json`, `package-lock.json` to Azure File Share
+
+2. **Docker Compose setup**:
+
+```yaml
+version: '3.8'
+services:
+  n8n:
+    image: n8nio/n8n:latest
+    ports:
+      - "5678:5678"
+    volumes:
+      - ~/.n8n:/home/node/.n8n
+      - /mnt/azure-fileshare:/data/custom  # Mount Azure File Share
+    environment:
+      - N8N_CUSTOM_EXTENSIONS=/data/custom/n8nCustom
+    command: >
+      sh -c "
+      cd /data/custom/n8nCustom/@hku/n8n-nodes-cosmos &&
+      npm install --production &&
+      n8n start
+      "
+```
+
+3. **Benefits**:
+   - ✅ No `node_modules` in deployment (smaller, faster uploads)
+   - ✅ Docker installs dependencies with correct platform binaries
+   - ✅ Automatic updates via GitHub Actions
+   - ✅ Shared storage across multiple containers
+
 ### Using Custom Image
 
 Create a `Dockerfile`:
@@ -170,7 +205,7 @@ docker run -it --rm \
   n8n-with-cosmos
 ```
 
-### Using Volume Mount
+### Using Volume Mount (Development)
 
 ```bash
 docker run -it --rm \
