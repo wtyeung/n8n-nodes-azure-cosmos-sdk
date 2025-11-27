@@ -6,26 +6,31 @@ import type {
 } from 'n8n-workflow';
 import { NodeOperationError } from 'n8n-workflow';
 import { CosmosClient } from '@azure/cosmos';
+import type { TokenCredential } from '@azure/cosmos';
 
-export class Cosmos implements INodeType {
+export class AzureCosmosSdk implements INodeType {
 	description: INodeTypeDescription = {
-		displayName: 'HKU Cosmos DB',
-		name: 'cosmos',
+		displayName: 'Azure Cosmos DB (SDK)',
+		name: 'azureCosmosSdk',
 		icon: 'fa:cloud',
 		iconColor: 'blue',
 		group: ['transform'],
 		version: 1,
-		description: 'Query Azure Cosmos DB using SQL',
+		description: 'Interact with Azure Cosmos DB using the official SDK (supports vector search and hybrid queries)',
 		defaults: {
-			name: 'HKU Cosmos DB',
+			name: 'Azure Cosmos DB (SDK)',
 		},
 		inputs: ['main'],
 		outputs: ['main'],
 		usableAsTool: true,
 		credentials: [
 			{
-				name: 'cosmosDbApi',
-				required: true,
+				name: 'azureCosmosSdkApi',
+				required: false,
+			},
+			{
+				name: 'azureCosmosSdkEntraIdApi',
+				required: false,
 			},
 		],
 		properties: [
@@ -223,12 +228,62 @@ export class Cosmos implements INodeType {
 		const items = this.getInputData();
 		const returnData: INodeExecutionData[] = [];
 
-		// Get credentials
-		const credentials = await this.getCredentials('cosmosDbApi');
-		const endpoint = credentials.endpoint as string;
-		const key = credentials.key as string;
+		// Determine which credential type is being used
+		let client: CosmosClient;
+		
+		try {
+			// Try Entra ID credentials first
+			const entraIdCredentials = await this.getCredentials('azureCosmosSdkEntraIdApi');
+			const endpoint = entraIdCredentials.endpoint as string;
+			const clientId = entraIdCredentials.clientId as string;
+			const clientSecret = entraIdCredentials.clientSecret as string;
+			const tenantId = entraIdCredentials.tenantId as string;
 
-		const client = new CosmosClient({ endpoint, key });
+			// Create a custom TokenCredential for Entra ID authentication
+			const tokenCredential: TokenCredential = {
+				async getToken() {
+					// Get OAuth2 token from Microsoft Entra ID
+					const tokenUrl = `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`;
+					const body = `grant_type=client_credentials&client_id=${encodeURIComponent(clientId)}&client_secret=${encodeURIComponent(clientSecret)}&scope=${encodeURIComponent('https://cosmos.azure.com/.default')}`;
+
+					const response = await fetch(tokenUrl, {
+						method: 'POST',
+						headers: {
+							'Content-Type': 'application/x-www-form-urlencoded',
+						},
+						body,
+					});
+
+					if (!response.ok) {
+						const error = await response.text();
+						throw new Error(`Failed to get Entra ID token: ${error}`);
+					}
+
+					const data = await response.json() as { access_token: string; expires_in: number };
+					const expiresOnTimestamp = Date.now() + (data.expires_in * 1000);
+					
+					return {
+						token: data.access_token,
+						expiresOnTimestamp,
+					};
+				},
+			};
+
+			client = new CosmosClient({ endpoint, aadCredentials: tokenCredential });
+		} catch (entraIdError) {
+			// Fall back to master key authentication
+			try {
+				const credentials = await this.getCredentials('azureCosmosSdkApi');
+				const endpoint = credentials.endpoint as string;
+				const key = credentials.key as string;
+				client = new CosmosClient({ endpoint, key });
+			} catch (masterKeyError) {
+				throw new NodeOperationError(
+					this.getNode(),
+					'No valid credentials found. Please configure either Azure Cosmos DB SDK API (master key) or Azure Cosmos DB SDK Entra ID credentials.',
+				);
+			}
+		}
 
 		for (let itemIndex = 0; itemIndex < items.length; itemIndex++) {
 			try {

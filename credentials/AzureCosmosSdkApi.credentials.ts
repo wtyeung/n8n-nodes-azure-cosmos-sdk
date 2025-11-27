@@ -7,9 +7,9 @@ import type {
 } from 'n8n-workflow';
 import { createHmac } from 'crypto';
 
-export class CosmosDbApi implements ICredentialType {
-	name = 'cosmosDbApi';
-	displayName = 'HKU Cosmos DB API';
+export class AzureCosmosSdkApi implements ICredentialType {
+	name = 'azureCosmosSdkApi';
+	displayName = 'Azure Cosmos DB SDK API';
 	documentationUrl = 'https://docs.microsoft.com/en-us/azure/cosmos-db/';
 	properties: INodeProperties[] = [
 		{

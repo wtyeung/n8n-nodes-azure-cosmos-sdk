@@ -1,28 +1,32 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.Cosmos = void 0;
+exports.AzureCosmosSdk = void 0;
 const n8n_workflow_1 = require("n8n-workflow");
 const cosmos_1 = require("@azure/cosmos");
-class Cosmos {
+class AzureCosmosSdk {
     constructor() {
         this.description = {
-            displayName: 'HKU Cosmos DB',
-            name: 'cosmos',
+            displayName: 'Azure Cosmos DB (SDK)',
+            name: 'azureCosmosSdk',
             icon: 'fa:cloud',
             iconColor: 'blue',
             group: ['transform'],
             version: 1,
-            description: 'Query Azure Cosmos DB using SQL',
+            description: 'Interact with Azure Cosmos DB using the official SDK (supports vector search and hybrid queries)',
             defaults: {
-                name: 'HKU Cosmos DB',
+                name: 'Azure Cosmos DB (SDK)',
             },
             inputs: ['main'],
             outputs: ['main'],
             usableAsTool: true,
             credentials: [
                 {
-                    name: 'cosmosDbApi',
-                    required: true,
+                    name: 'azureCosmosSdkApi',
+                    required: false,
+                },
+                {
+                    name: 'azureCosmosSdkEntraIdApi',
+                    required: false,
                 },
             ],
             properties: [
@@ -217,13 +221,51 @@ class Cosmos {
         };
     }
     async execute() {
-        var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m;
         const items = this.getInputData();
         const returnData = [];
-        const credentials = await this.getCredentials('cosmosDbApi');
-        const endpoint = credentials.endpoint;
-        const key = credentials.key;
-        const client = new cosmos_1.CosmosClient({ endpoint, key });
+        let client;
+        try {
+            const entraIdCredentials = await this.getCredentials('azureCosmosSdkEntraIdApi');
+            const endpoint = entraIdCredentials.endpoint;
+            const clientId = entraIdCredentials.clientId;
+            const clientSecret = entraIdCredentials.clientSecret;
+            const tenantId = entraIdCredentials.tenantId;
+            const tokenCredential = {
+                async getToken() {
+                    const tokenUrl = `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`;
+                    const body = `grant_type=client_credentials&client_id=${encodeURIComponent(clientId)}&client_secret=${encodeURIComponent(clientSecret)}&scope=${encodeURIComponent('https://cosmos.azure.com/.default')}`;
+                    const response = await fetch(tokenUrl, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/x-www-form-urlencoded',
+                        },
+                        body,
+                    });
+                    if (!response.ok) {
+                        const error = await response.text();
+                        throw new Error(`Failed to get Entra ID token: ${error}`);
+                    }
+                    const data = await response.json();
+                    const expiresOnTimestamp = Date.now() + (data.expires_in * 1000);
+                    return {
+                        token: data.access_token,
+                        expiresOnTimestamp,
+                    };
+                },
+            };
+            client = new cosmos_1.CosmosClient({ endpoint, aadCredentials: tokenCredential });
+        }
+        catch (entraIdError) {
+            try {
+                const credentials = await this.getCredentials('azureCosmosSdkApi');
+                const endpoint = credentials.endpoint;
+                const key = credentials.key;
+                client = new cosmos_1.CosmosClient({ endpoint, key });
+            }
+            catch (masterKeyError) {
+                throw new n8n_workflow_1.NodeOperationError(this.getNode(), 'No valid credentials found. Please configure either Azure Cosmos DB SDK API (master key) or Azure Cosmos DB SDK Entra ID credentials.');
+            }
+        }
         for (let itemIndex = 0; itemIndex < items.length; itemIndex++) {
             try {
                 const operation = this.getNodeParameter('operation', itemIndex);
@@ -262,7 +304,7 @@ class Cosmos {
                         });
                     }
                     const containerDef = await container.read();
-                    const partitionKeyPath = ((_d = (_c = (_b = (_a = containerDef.resource) === null || _a === void 0 ? void 0 : _a.partitionKey) === null || _b === void 0 ? void 0 : _b.paths) === null || _c === void 0 ? void 0 : _c[0]) === null || _d === void 0 ? void 0 : _d.replace('/', '')) || 'id';
+                    const partitionKeyPath = containerDef.resource?.partitionKey?.paths?.[0]?.replace('/', '') || 'id';
                     if (!Object.prototype.hasOwnProperty.call(document, partitionKeyPath)) {
                         throw new n8n_workflow_1.NodeOperationError(this.getNode(), `Document must include the partition key field '${partitionKeyPath}'. Add this field to your document.`, { itemIndex });
                     }
@@ -299,7 +341,7 @@ class Cosmos {
                         });
                     }
                     const containerDef = await container.read();
-                    const partitionKeyPath = ((_h = (_g = (_f = (_e = containerDef.resource) === null || _e === void 0 ? void 0 : _e.partitionKey) === null || _f === void 0 ? void 0 : _f.paths) === null || _g === void 0 ? void 0 : _g[0]) === null || _h === void 0 ? void 0 : _h.replace('/', '')) || 'id';
+                    const partitionKeyPath = containerDef.resource?.partitionKey?.paths?.[0]?.replace('/', '') || 'id';
                     if (!Object.prototype.hasOwnProperty.call(document, partitionKeyPath)) {
                         throw new n8n_workflow_1.NodeOperationError(this.getNode(), `Document must include the partition key field '${partitionKeyPath}'. Add this field to your document.`, { itemIndex });
                     }
@@ -346,7 +388,7 @@ class Cosmos {
                         const deletedIds = [];
                         const errors = [];
                         const containerDef = await container.read();
-                        const partitionKeyPath = ((_m = (_l = (_k = (_j = containerDef.resource) === null || _j === void 0 ? void 0 : _j.partitionKey) === null || _k === void 0 ? void 0 : _k.paths) === null || _l === void 0 ? void 0 : _l[0]) === null || _m === void 0 ? void 0 : _m.replace('/', '')) || 'id';
+                        const partitionKeyPath = containerDef.resource?.partitionKey?.paths?.[0]?.replace('/', '') || 'id';
                         if (resources.length > 0 && !Object.prototype.hasOwnProperty.call(resources[0], partitionKeyPath)) {
                             throw new n8n_workflow_1.NodeOperationError(this.getNode(), `Query must include the partition key field '${partitionKeyPath}'. ` +
                                 `Use: SELECT * FROM c WHERE ... or SELECT c.id, c.${partitionKeyPath} FROM c WHERE ...`, { itemIndex });
@@ -408,5 +450,5 @@ class Cosmos {
         return [returnData];
     }
 }
-exports.Cosmos = Cosmos;
-//# sourceMappingURL=Cosmos.node.js.map
+exports.AzureCosmosSdk = AzureCosmosSdk;
+//# sourceMappingURL=AzureCosmosSdk.node.js.map

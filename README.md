@@ -1,10 +1,10 @@
-# @hku/n8n-nodes-cosmos
+# @timyeung/n8n-nodes-azure-cosmos-sdk
 
-This is an n8n community node for Azure Cosmos DB. It provides **complete SQL query freedom** using the official Azure Cosmos DB SDK, enabling advanced features like **hybrid search** and **vector similarity search**.
+This is an n8n community node for Azure Cosmos DB. It provides **complete SQL query freedom** using the official **Azure Cosmos DB SDK**, enabling advanced features like **hybrid search**, **vector similarity search**, and **Microsoft Entra ID authentication**.
 
 ## Why Use This Node?
 
-Unlike the native n8n Cosmos DB node, this implementation:
+Unlike the native n8n Cosmos DB node (which uses REST API), this implementation:
 
 - ✅ **Uses Azure Cosmos DB SDK** (not REST API) for full feature support
 - ✅ **Complete query freedom** - write any SQL query including hybrid search
@@ -95,15 +95,34 @@ Insert new documents into a container:
 
 ## Credentials
 
-To use this node, you need:
+This node supports two authentication methods:
+
+### Option 1: Master Key Authentication (Default)
 
 1. **Azure Cosmos DB Account**: Sign up at [Azure Portal](https://portal.azure.com/)
 2. **Endpoint URL**: Your Cosmos DB account endpoint (e.g., `https://your-account.documents.azure.com:443/`)
 3. **Access Key**: Primary or secondary key from Azure Portal → Your Cosmos DB Account → Keys
 
-### Authentication
+The credential test uses **HMAC-SHA256 signature authentication** with master keys to verify your connection by listing databases.
 
-The node uses the **Azure Cosmos DB SDK** (`@azure/cosmos`) for authentication and queries. The credential test uses **HMAC-SHA256 signature authentication** with master keys to verify your connection by listing databases.
+### Option 2: Microsoft Entra ID (Azure AD) Authentication
+
+For enhanced security using OAuth2 and role-based access control (RBAC):
+
+1. **Azure Cosmos DB Account**: Your Cosmos DB endpoint URL
+2. **Client ID**: Application (client) ID from Azure App Registration
+3. **Client Secret**: Client secret from Azure App Registration
+4. **Tenant ID**: Directory (tenant) ID from Azure App Registration
+
+**Setup Steps:**
+1. Create an App Registration in Azure Portal → Microsoft Entra ID
+2. Create a client secret for the app
+3. Assign the app appropriate Cosmos DB RBAC roles (e.g., "Cosmos DB Built-in Data Contributor")
+4. Use the app credentials in n8n
+
+**Scopes Used:** `https://cosmos.azure.com/.default` with `offline_access`
+
+The node uses the **Azure Cosmos DB SDK** (`@azure/cosmos`) with OAuth2 token authentication.
 
 ## Compatibility
 
@@ -115,7 +134,7 @@ The node uses the **Azure Cosmos DB SDK** (`@azure/cosmos`) for authentication a
 
 ### Select Operation
 
-1. Add the **HKU Cosmos DB** node to your workflow
+1. Add the **Azure Cosmos DB (SDK)** node to your workflow
 2. Select or create credentials with your Cosmos DB endpoint and access key
 3. Choose **Select** operation
 4. Enter:
@@ -135,7 +154,7 @@ This is useful when vector data isn't needed in downstream nodes.
 
 ### Insert Operation
 
-1. Add the **HKU Cosmos DB** node to your workflow
+1. Add the **Azure Cosmos DB (SDK)** node to your workflow
 2. Select or create credentials
 3. Choose **Insert** operation
 4. Enter:
