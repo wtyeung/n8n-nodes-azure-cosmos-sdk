@@ -12,6 +12,8 @@ Unlike the native n8n Cosmos DB node (which uses REST API), this implementation:
 - ✅ **Vector field exclusion** - optionally exclude large embedding fields to reduce payload
 - ✅ **Modern SDK features** - access to latest Cosmos DB capabilities
 
+> **Note:** Hybrid search and vector similarity features (`VectorDistance()`, `RRF()`, etc.) are **only available through the SDK**. The NoSQL REST API does not support these advanced query capabilities. This is why this node uses the official Azure Cosmos DB SDK instead of REST API.
+
 Azure Cosmos DB is a fully managed NoSQL and relational database for modern app development with vector database support.
 
 [n8n](https://n8n.io/) is a [fair-code licensed](https://docs.n8n.io/sustainable-use-license/) workflow automation platform.
