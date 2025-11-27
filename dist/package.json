@@ -3,7 +3,7 @@
     "version": "0.1.4",
     "description": "n8n node for Azure Cosmos DB using official SDK with hybrid search, vector similarity, and Entra ID support",
     "license": "MIT",
-    "homepage": "https://github.com/timyeung/n8n-nodes-azure-cosmos-sdk",
+    "homepage": "https://github.com/wtyeung/n8n-nodes-azure-cosmos-sdk",
     "keywords": [
         "n8n-community-node-package"
     ],
@@ -13,7 +13,7 @@
     },
     "repository": {
         "type": "git",
-        "url": "https://github.com/timyeung/n8n-nodes-azure-cosmos-sdk.git"
+        "url": "https://github.com/wtyeung/n8n-nodes-azure-cosmos-sdk.git"
     },
     "scripts": {
         "build": "n8n-node build",
