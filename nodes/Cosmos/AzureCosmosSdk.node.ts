@@ -26,14 +26,43 @@ export class AzureCosmosSdk implements INodeType {
 		credentials: [
 			{
 				name: 'azureCosmosSdkApi',
-				required: false,
+				required: true,
+				displayOptions: {
+					show: {
+						authenticationType: ['masterKey'],
+					},
+				},
 			},
 			{
 				name: 'azureCosmosSdkEntraIdApi',
-				required: false,
+				required: true,
+				displayOptions: {
+					show: {
+						authenticationType: ['entraId'],
+					},
+				},
 			},
 		],
 		properties: [
+			{
+				displayName: 'Authentication Type',
+				name: 'authenticationType',
+				type: 'options',
+				options: [
+					{
+						name: 'Master Key',
+						value: 'masterKey',
+						description: 'Authenticate using Cosmos DB master key',
+					},
+					{
+						name: 'Microsoft Entra ID',
+						value: 'entraId',
+						description: 'Authenticate using Microsoft Entra ID (Azure AD) OAuth2',
+					},
+				],
+				default: 'masterKey',
+				description: 'The authentication method to use',
+			},
 			{
 				displayName: 'Operation',
 				name: 'operation',
@@ -228,11 +257,12 @@ export class AzureCosmosSdk implements INodeType {
 		const items = this.getInputData();
 		const returnData: INodeExecutionData[] = [];
 
-		// Determine which credential type is being used
+		// Get authentication type from the first item
+		const authenticationType = this.getNodeParameter('authenticationType', 0) as string;
 		let client: CosmosClient;
 		
-		try {
-			// Try Entra ID credentials first
+		if (authenticationType === 'entraId') {
+			// Use Entra ID authentication
 			const entraIdCredentials = await this.getCredentials('azureCosmosSdkEntraIdApi');
 			const endpoint = entraIdCredentials.endpoint as string;
 			const clientId = entraIdCredentials.clientId as string;
@@ -256,6 +286,7 @@ export class AzureCosmosSdk implements INodeType {
 
 					if (!response.ok) {
 						const error = await response.text();
+						// eslint-disable-next-line n8n-nodes-base/node-execute-block-wrong-error-thrown
 						throw new Error(`Failed to get Entra ID token: ${error}`);
 					}
 
@@ -270,19 +301,12 @@ export class AzureCosmosSdk implements INodeType {
 			};
 
 			client = new CosmosClient({ endpoint, aadCredentials: tokenCredential });
-		} catch (entraIdError) {
-			// Fall back to master key authentication
-			try {
-				const credentials = await this.getCredentials('azureCosmosSdkApi');
-				const endpoint = credentials.endpoint as string;
-				const key = credentials.key as string;
-				client = new CosmosClient({ endpoint, key });
-			} catch (masterKeyError) {
-				throw new NodeOperationError(
-					this.getNode(),
-					'No valid credentials found. Please configure either Azure Cosmos DB SDK API (master key) or Azure Cosmos DB SDK Entra ID credentials.',
-				);
-			}
+		} else {
+			// Use master key authentication
+			const credentials = await this.getCredentials('azureCosmosSdkApi');
+			const endpoint = credentials.endpoint as string;
+			const key = credentials.key as string;
+			client = new CosmosClient({ endpoint, key });
 		}
 
 		for (let itemIndex = 0; itemIndex < items.length; itemIndex++) {

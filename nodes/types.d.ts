@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // Type declarations for Node.js built-ins and global APIs
 declare module 'crypto' {
 	export function createHmac(algorithm: string, key: Buffer | string): {
