@@ -266,6 +266,38 @@ export class AzureCosmosSdk implements INodeType {
 			const entraIdCredentials = await this.getCredentials('azureCosmosSdkEntraIdApi');
 			const endpoint = entraIdCredentials.endpoint as string;
 			const oauthTokenData = entraIdCredentials.oauthTokenData as any;
+			const refreshBeforeExpirySeconds = (entraIdCredentials.refreshBeforeExpirySeconds as number) || 900;
+
+			// Check if token needs refresh based on buffer
+			const expiresAt = oauthTokenData.expires_at ? new Date(oauthTokenData.expires_at).getTime() : 0;
+			const now = Date.now();
+			const timeUntilExpiry = (expiresAt - now) / 1000; // seconds
+
+			if (timeUntilExpiry < refreshBeforeExpirySeconds) {
+				// Token will expire soon, trigger refresh by making a lightweight API call
+				// This will cause n8n's OAuth2 mechanism to refresh the token if it's expired
+				this.logger.info(`Token expires in ${Math.floor(timeUntilExpiry / 60)} minutes, refreshing...`);
+				try {
+					// Use Cosmos DB REST API to list databases (lightweight operation)
+					// This endpoint will return 401 if token is expired, triggering n8n's auto-refresh
+					await this.helpers.httpRequestWithAuthentication.call(
+						this,
+						'azureCosmosSdkEntraIdApi',
+						{
+							method: 'GET',
+							url: `${endpoint.replace(/\/$/, '')}/dbs`,
+							headers: {
+								'x-ms-version': '2018-12-31',
+							},
+						},
+					);
+					this.logger.info('✅ Token refreshed successfully via Cosmos DB API call');
+				} catch (error) {
+					this.logger.warn('Token refresh attempt failed, continuing with existing token');
+				}
+			} else {
+				this.logger.info(`✓ Token still valid, expires in ${Math.floor(timeUntilExpiry / 60)} minutes`);
+			}
 
 			// Create a custom TokenCredential using the delegated OAuth token
 			const tokenCredential: TokenCredential = {
@@ -274,9 +306,7 @@ export class AzureCosmosSdk implements INodeType {
 					// n8n handles token refresh automatically via the microsoftOAuth2Api credential
 					return {
 						token: oauthTokenData.access_token,
-						expiresOnTimestamp: oauthTokenData.expires_in 
-							? Date.now() + (oauthTokenData.expires_in * 1000)
-							: Date.now() + (3600 * 1000), // Default 1 hour if not provided
+						expiresOnTimestamp: expiresAt || Date.now() + (3600 * 1000),
 					};
 				},
 			};

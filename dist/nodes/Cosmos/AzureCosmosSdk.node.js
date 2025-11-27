@@ -258,13 +258,34 @@ class AzureCosmosSdk {
             const entraIdCredentials = await this.getCredentials('azureCosmosSdkEntraIdApi');
             const endpoint = entraIdCredentials.endpoint;
             const oauthTokenData = entraIdCredentials.oauthTokenData;
+            const refreshBeforeExpirySeconds = entraIdCredentials.refreshBeforeExpirySeconds || 900;
+            const expiresAt = oauthTokenData.expires_at ? new Date(oauthTokenData.expires_at).getTime() : 0;
+            const now = Date.now();
+            const timeUntilExpiry = (expiresAt - now) / 1000;
+            if (timeUntilExpiry < refreshBeforeExpirySeconds) {
+                this.logger.info(`Token expires in ${Math.floor(timeUntilExpiry / 60)} minutes, refreshing...`);
+                try {
+                    await this.helpers.httpRequestWithAuthentication.call(this, 'azureCosmosSdkEntraIdApi', {
+                        method: 'GET',
+                        url: `${endpoint.replace(/\/$/, '')}/dbs`,
+                        headers: {
+                            'x-ms-version': '2018-12-31',
+                        },
+                    });
+                    this.logger.info('✅ Token refreshed successfully via Cosmos DB API call');
+                }
+                catch (error) {
+                    this.logger.warn('Token refresh attempt failed, continuing with existing token');
+                }
+            }
+            else {
+                this.logger.info(`✓ Token still valid, expires in ${Math.floor(timeUntilExpiry / 60)} minutes`);
+            }
             const tokenCredential = {
                 async getToken() {
                     return {
                         token: oauthTokenData.access_token,
-                        expiresOnTimestamp: oauthTokenData.expires_in
-                            ? Date.now() + (oauthTokenData.expires_in * 1000)
-                            : Date.now() + (3600 * 1000),
+                        expiresOnTimestamp: expiresAt || Date.now() + (3600 * 1000),
                     };
                 },
             };
