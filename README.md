@@ -107,22 +107,26 @@ The credential test uses **HMAC-SHA256 signature authentication** with master ke
 
 ### Option 2: Microsoft Entra ID (Azure AD) Authentication
 
-For enhanced security using OAuth2 and role-based access control (RBAC):
+For enhanced security using OAuth2 user delegation and role-based access control (RBAC):
 
-1. **Azure Cosmos DB Account**: Your Cosmos DB endpoint URL
-2. **Client ID**: Application (client) ID from Azure App Registration
-3. **Client Secret**: Client secret from Azure App Registration
-4. **Tenant ID**: Directory (tenant) ID from Azure App Registration
+This credential **extends n8n's Microsoft OAuth2 API** credential, which handles the OAuth2 authorization code flow and automatic token refresh.
 
 **Setup Steps:**
 1. Create an App Registration in Azure Portal → Microsoft Entra ID
-2. Create a client secret for the app
-3. Assign the app appropriate Cosmos DB RBAC roles (e.g., "Cosmos DB Built-in Data Contributor")
-4. Use the app credentials in n8n
+2. Add redirect URI: `https://your-n8n-instance/rest/oauth2-credential/callback`
+3. Under "API permissions", add delegated permission: `Azure Cosmos DB` → `user_impersonation`
+4. Grant admin consent for the permission
+5. Assign the user appropriate Cosmos DB RBAC roles (e.g., "Cosmos DB Built-in Data Contributor")
+6. In n8n, create a "Microsoft OAuth2 API" credential with:
+   - **Scope**: `https://cosmos.azure.com/user_impersonation offline_access`
+   - Your app's Client ID and Client Secret
+7. Create "Azure Cosmos DB SDK (Entra ID) API" credential:
+   - Select your Microsoft OAuth2 credential
+   - Enter your Cosmos DB endpoint URL
 
-**Scopes Used:** `https://cosmos.azure.com/.default` with `offline_access`
+**Scopes Used:** `https://cosmos.azure.com/user_impersonation` with `offline_access` for token refresh
 
-The node uses the **Azure Cosmos DB SDK** (`@azure/cosmos`) with OAuth2 token authentication.
+The node uses **user delegation** (on-behalf-of the authenticated user) with the Azure Cosmos DB SDK.
 
 ## Compatibility
 

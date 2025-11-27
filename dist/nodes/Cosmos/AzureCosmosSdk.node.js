@@ -257,29 +257,14 @@ class AzureCosmosSdk {
         if (authenticationType === 'entraId') {
             const entraIdCredentials = await this.getCredentials('azureCosmosSdkEntraIdApi');
             const endpoint = entraIdCredentials.endpoint;
-            const clientId = entraIdCredentials.clientId;
-            const clientSecret = entraIdCredentials.clientSecret;
-            const tenantId = entraIdCredentials.tenantId;
+            const oauthTokenData = entraIdCredentials.oauthTokenData;
             const tokenCredential = {
                 async getToken() {
-                    const tokenUrl = `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`;
-                    const body = `grant_type=client_credentials&client_id=${encodeURIComponent(clientId)}&client_secret=${encodeURIComponent(clientSecret)}&scope=${encodeURIComponent('https://cosmos.azure.com/.default')}`;
-                    const response = await fetch(tokenUrl, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/x-www-form-urlencoded',
-                        },
-                        body,
-                    });
-                    if (!response.ok) {
-                        const error = await response.text();
-                        throw new Error(`Failed to get Entra ID token: ${error}`);
-                    }
-                    const data = await response.json();
-                    const expiresOnTimestamp = Date.now() + (data.expires_in * 1000);
                     return {
-                        token: data.access_token,
-                        expiresOnTimestamp,
+                        token: oauthTokenData.access_token,
+                        expiresOnTimestamp: oauthTokenData.expires_in
+                            ? Date.now() + (oauthTokenData.expires_in * 1000)
+                            : Date.now() + (3600 * 1000),
                     };
                 },
             };

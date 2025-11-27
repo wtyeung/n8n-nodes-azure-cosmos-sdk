@@ -262,40 +262,21 @@ export class AzureCosmosSdk implements INodeType {
 		let client: CosmosClient;
 		
 		if (authenticationType === 'entraId') {
-			// Use Entra ID authentication
+			// Use Entra ID authentication with Microsoft OAuth2
 			const entraIdCredentials = await this.getCredentials('azureCosmosSdkEntraIdApi');
 			const endpoint = entraIdCredentials.endpoint as string;
-			const clientId = entraIdCredentials.clientId as string;
-			const clientSecret = entraIdCredentials.clientSecret as string;
-			const tenantId = entraIdCredentials.tenantId as string;
+			const oauthTokenData = entraIdCredentials.oauthTokenData as any;
 
-			// Create a custom TokenCredential for Entra ID authentication
+			// Create a custom TokenCredential using the delegated OAuth token
 			const tokenCredential: TokenCredential = {
 				async getToken() {
-					// Get OAuth2 token from Microsoft Entra ID
-					const tokenUrl = `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`;
-					const body = `grant_type=client_credentials&client_id=${encodeURIComponent(clientId)}&client_secret=${encodeURIComponent(clientSecret)}&scope=${encodeURIComponent('https://cosmos.azure.com/.default')}`;
-
-					const response = await fetch(tokenUrl, {
-						method: 'POST',
-						headers: {
-							'Content-Type': 'application/x-www-form-urlencoded',
-						},
-						body,
-					});
-
-					if (!response.ok) {
-						const error = await response.text();
-						// eslint-disable-next-line n8n-nodes-base/node-execute-block-wrong-error-thrown
-						throw new Error(`Failed to get Entra ID token: ${error}`);
-					}
-
-					const data = await response.json() as { access_token: string; expires_in: number };
-					const expiresOnTimestamp = Date.now() + (data.expires_in * 1000);
-					
+					// Use the access token from Microsoft OAuth2 credential
+					// n8n handles token refresh automatically via the microsoftOAuth2Api credential
 					return {
-						token: data.access_token,
-						expiresOnTimestamp,
+						token: oauthTokenData.access_token,
+						expiresOnTimestamp: oauthTokenData.expires_in 
+							? Date.now() + (oauthTokenData.expires_in * 1000)
+							: Date.now() + (3600 * 1000), // Default 1 hour if not provided
 					};
 				},
 			};
