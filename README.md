@@ -1,4 +1,4 @@
-# @timyeung/n8n-nodes-azure-cosmos-sdk
+# n8n-nodes-azure-cosmos-sdk
 
 This is an n8n community node for Azure Cosmos DB. It provides **complete SQL query freedom** using the official **Azure Cosmos DB SDK**, enabling advanced features like **hybrid search**, **vector similarity search**, and **Microsoft Entra ID authentication**.
 
