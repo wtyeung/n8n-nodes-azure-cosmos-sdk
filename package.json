@@ -24,8 +24,7 @@
         "link:dev": "npm install --prefix ~/.n8n-node-cli/.n8n/nodes \"$npm_package_name@file:$PWD\"",
         "lint": "n8n-node lint",
         "lint:fix": "n8n-node lint --fix",
-        "release": "n8n-node release",
-        "prepublishOnly": "n8n-node prerelease"
+        "release": "n8n-node release"
     },
     "files": [
         "dist",
