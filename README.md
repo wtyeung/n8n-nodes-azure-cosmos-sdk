@@ -10,6 +10,7 @@ Unlike the native n8n Cosmos DB node (which uses REST API), this implementation:
 - ✅ **Complete query freedom** - write any SQL query including hybrid search
 - ✅ **Vector similarity search** - supports `VectorDistance()` and hybrid search queries
 - ✅ **Vector field exclusion** - optionally exclude large embedding fields to reduce payload
+- ✅ **Role-Based Access Control (RBAC)** - supports Microsoft Entra ID authentication with granular permissions
 - ✅ **Modern SDK features** - access to latest Cosmos DB capabilities
 
 > **Note:** Hybrid search and vector similarity features (`VectorDistance()`, `RRF()`, etc.) are **only available through the SDK**. The NoSQL REST API does not support these advanced query capabilities. This is why this node uses the official Azure Cosmos DB SDK instead of REST API.
@@ -107,28 +108,38 @@ This node supports two authentication methods:
 
 The credential test uses **HMAC-SHA256 signature authentication** with master keys to verify your connection by listing databases.
 
-### Option 2: Microsoft Entra ID (Azure AD) Authentication
+### Option 2: Microsoft Entra ID (Azure AD) Authentication with RBAC
 
-For enhanced security using OAuth2 user delegation and role-based access control (RBAC):
+For enhanced security using OAuth2 user delegation and **Role-Based Access Control (RBAC)**:
 
 This credential **extends n8n's Microsoft OAuth2 API** credential, which handles the OAuth2 authorization code flow and automatic token refresh.
+
+**RBAC Benefits:**
+- ✅ **Granular permissions** - Assign specific roles (Data Reader, Data Contributor, etc.) instead of full access
+- ✅ **Auditable** - All operations are tied to the authenticated user's identity
+- ✅ **Revocable** - Remove access without changing master keys
+- ✅ **Secure** - No need to share master keys across teams
 
 **Setup Steps:**
 1. Create an App Registration in Azure Portal → Microsoft Entra ID
 2. Add redirect URI: `https://your-n8n-instance/rest/oauth2-credential/callback`
 3. Under "API permissions", add delegated permission: `Azure Cosmos DB` → `user_impersonation`
 4. Grant admin consent for the permission
-5. Assign the user appropriate Cosmos DB RBAC roles (e.g., "Cosmos DB Built-in Data Contributor")
+5. **Assign Cosmos DB RBAC roles** to users in Azure Portal → Cosmos DB Account → Access Control (IAM):
+   - **Cosmos DB Built-in Data Reader** - Read-only access to data
+   - **Cosmos DB Built-in Data Contributor** - Read and write access to data
+   - Custom roles for fine-grained control
 6. In n8n, create a "Microsoft OAuth2 API" credential with:
    - **Scope**: `https://cosmos.azure.com/user_impersonation offline_access`
    - Your app's Client ID and Client Secret
 7. Create "Azure Cosmos DB SDK (Entra ID) API" credential:
    - Select your Microsoft OAuth2 credential
    - Enter your Cosmos DB endpoint URL
+   - Configure token refresh buffer (optional, default: 900 seconds)
 
 **Scopes Used:** `https://cosmos.azure.com/user_impersonation` with `offline_access` for token refresh
 
-The node uses **user delegation** (on-behalf-of the authenticated user) with the Azure Cosmos DB SDK.
+The node uses **user delegation** (on-behalf-of the authenticated user) with the Azure Cosmos DB SDK. Access is controlled by the RBAC roles assigned to the user.
 
 ## Compatibility
 
