@@ -480,6 +480,21 @@ export class AzureCosmosSdk implements INodeType {
 						// Execute the query to get documents to delete
 						const { resources } = await container.items.query(deleteQuery).fetchAll();
 
+						// Handle case where no documents match the query
+						if (!resources || resources.length === 0) {
+							returnData.push({
+								json: {
+									success: true,
+									deletedCount: 0,
+									totalQueried: 0,
+									deletedIds: [],
+									message: 'No documents matched the query',
+								},
+								pairedItem: itemIndex,
+							});
+							continue;
+						}
+
 						let deletedCount = 0;
 						const deletedIds: string[] = [];
 						const errors: Array<{id: string, error: string}> = [];
