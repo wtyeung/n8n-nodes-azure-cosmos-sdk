@@ -1,6 +1,6 @@
 {
     "name": "n8n-nodes-azure-cosmos-sdk",
-    "version": "0.2.0",
+    "version": "0.2.1",
     "description": "n8n node for Azure Cosmos DB using official SDK with hybrid search, vector similarity, and Entra ID support",
     "license": "MIT",
     "homepage": "https://github.com/wtyeung/n8n-nodes-azure-cosmos-sdk",
