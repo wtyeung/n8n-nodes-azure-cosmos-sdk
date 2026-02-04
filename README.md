@@ -45,9 +45,55 @@ npm run dev
 
 ## Operations
 
-This node supports multiple operations against Azure Cosmos DB containers:
+This node supports comprehensive operations for Azure Cosmos DB databases and containers:
 
-### Select (Query Documents)
+### Database Operations
+
+#### Create Database
+
+Create a new Cosmos DB database:
+
+- **Database Name**: Unique identifier for the database
+- **Throughput (RU/s)**: Optional provisioned throughput (minimum 400 RU/s, or 0 for serverless)
+- **Idempotent**: Returns existing database if already exists (status code 200 vs 201)
+
+#### Delete Database
+
+Delete a database and all its containers:
+
+- **Database Selection**: Choose from list or enter name/ID manually
+- **Dynamic Loading**: Select from existing databases dropdown
+- **Error Handling**: Returns 404 if database not found
+
+### Container Operations
+
+#### Create Container
+
+Create a new container with advanced indexing:
+
+- **Database Selection**: Choose from list or enter name/ID manually
+- **Container Name**: Unique identifier for the container
+- **Partition Key**: Required path (e.g., `/category`, `/userId`)
+- **Throughput (RU/s)**: Optional container-level throughput
+- **Vector Index**: Optional vector similarity search configuration
+  - Vector path, type (float32/int8/uint8), dimensions
+  - Distance function (cosine, dotproduct, euclidean)
+  - Index type (quantizedFlat, diskANN, flat)
+- **Full-Text Index**: Optional full-text search on specified paths
+- **Idempotent**: Returns existing container if already exists
+
+#### Delete Container
+
+Delete a container from a database:
+
+- **Database Selection**: Choose from list or enter name/ID manually
+- **Container Selection**: Choose from list or enter name/ID manually
+- **Dynamic Loading**: Container list updates based on selected database
+- **Error Handling**: Returns 404 if container not found
+
+### Document Operations
+
+#### Select (Query Documents)
 
 Execute **full SQL queries** with complete freedom:
 
@@ -78,7 +124,7 @@ WHERE c.category = "research" AND c.year >= 2023
 ORDER BY VectorDistance(c.embedding, [0.1, 0.2, ...])
 ```
 
-### Insert (Create Document)
+#### Insert (Create Document)
 
 Insert new documents into a container:
 
@@ -95,6 +141,20 @@ Insert new documents into a container:
   "status": "active"
 }
 ```
+
+#### Create or Update (Upsert)
+
+Create a new document or update if it already exists:
+
+- **Idempotent**: Safe to run multiple times
+- **Automatic Merge**: Updates existing documents with new data
+
+#### Delete
+
+Delete documents from a container:
+
+- **By ID**: Delete a specific document by ID and partition key
+- **By Query**: Delete multiple documents matching a SQL query
 
 ## Credentials
 
@@ -149,10 +209,33 @@ The node uses **user delegation** (on-behalf-of the authenticated user) with the
 
 ## Usage
 
+### Create Database
+
+1. Add the **Azure Cosmos DB (SDK)** node to your workflow
+2. Select or create credentials
+3. Choose **Create Database** operation
+4. Enter:
+   - **Database Name**: Unique name for your database
+   - **Throughput (RU/s)**: Set to 0 for serverless, or minimum 400 for provisioned
+
+### Create Container with Vector Search
+
+1. Add the **Azure Cosmos DB (SDK)** node to your workflow
+2. Select or create credentials
+3. Choose **Create Container** operation
+4. Select or enter **Database** name
+5. Enter **Container Name** and **Partition Key Path** (e.g., `/category`)
+6. Enable **Vector Index** and configure:
+   - **Vector Path**: `/embedding` or `/vector`
+   - **Dimensions**: 1536 (for OpenAI embeddings) or your model's dimension
+   - **Distance Function**: `cosine` (recommended for most use cases)
+   - **Index Type**: `quantizedFlat` (balanced) or `diskANN` (high performance)
+7. Optionally enable **Full-Text Index** with paths like `/text,/content`
+
 ### Select Operation
 
 1. Add the **Azure Cosmos DB (SDK)** node to your workflow
-2. Select or create credentials with your Cosmos DB endpoint and access key
+2. Select or create credentials
 3. Choose **Select** operation
 4. Enter:
    - **Database Name**: Your Cosmos DB database name
@@ -183,6 +266,14 @@ This is useful when vector data isn't needed in downstream nodes.
 - The `id` field is required and must be unique
 - Partition key must be included if your container uses one
 - You can use expressions to dynamically generate documents from previous nodes
+
+### Delete Database or Container
+
+1. Add the **Azure Cosmos DB (SDK)** node to your workflow
+2. Select or create credentials
+3. Choose **Delete Database** or **Delete Container** operation
+4. Select the resource from the dropdown or enter manually
+5. For containers, select the database first, then the container list will load automatically
 
 ## Resources
 
