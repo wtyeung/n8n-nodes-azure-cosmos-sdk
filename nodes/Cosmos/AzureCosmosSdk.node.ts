@@ -399,10 +399,10 @@ export class AzureCosmosSdk implements INodeType {
 				displayName: 'Partition Key Path',
 				name: 'partitionKeyPath',
 				type: 'string',
-				default: '/category',
+				default: '/partitionKey',
 				required: true,
-				placeholder: '/category',
-				description: 'The partition key path (e.g., /category, /userId). Must start with /',
+				placeholder: '/partitionKey',
+				description: 'The partition key path (e.g., /partitionKey, /category, /userId). Must start with /',
 				displayOptions: {
 					show: {
 						operation: ['createContainer'],
