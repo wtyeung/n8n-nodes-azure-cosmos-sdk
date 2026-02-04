@@ -24,6 +24,7 @@ export class AzureCosmosSdkEntraIdApi implements ICredentialType {
 			default: 'https://cosmos.azure.com/user_impersonation',
 			description: '⚠️ REQUIRED: Azure Cosmos DB API scope. Note: offline_access is automatically added for token refresh.',
 			hint: 'Use <code>https://cosmos.azure.com/user_impersonation</code> for delegated permissions or <code>https://cosmos.azure.com/.default</code> for application permissions',
+			noDataExpression: true,
 		},
 		{
 			displayName: 'Endpoint',
@@ -33,6 +34,7 @@ export class AzureCosmosSdkEntraIdApi implements ICredentialType {
 			required: true,
 			placeholder: 'https://your-account.documents.azure.com:443/',
 			description: 'The Cosmos DB account endpoint URL',
+			noDataExpression: true,
 		},
 		{
 			displayName: 'Token Refresh Buffer (seconds)',
