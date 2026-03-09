@@ -29,9 +29,9 @@ class AzureCosmosSdkEntraIdApi {
                 name: 'endpoint',
                 type: 'string',
                 default: '',
-                required: true,
+                required: false,
                 placeholder: 'https://your-account.documents.azure.com:443/',
-                description: 'The Cosmos DB account endpoint URL',
+                description: 'The Cosmos DB account endpoint URL (optional if set via environment variable)',
                 noDataExpression: true,
             },
             {
