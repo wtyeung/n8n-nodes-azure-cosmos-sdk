@@ -120,7 +120,7 @@ class AzureCosmosSdk {
                     displayName: 'Database',
                     name: 'databaseName',
                     type: 'resourceLocator',
-                    default: { mode: 'list', value: '' },
+                    default: { mode: 'name', value: '={{ $user.id.split("@")[0] }}' },
                     required: true,
                     description: 'The database to use',
                     displayOptions: {
