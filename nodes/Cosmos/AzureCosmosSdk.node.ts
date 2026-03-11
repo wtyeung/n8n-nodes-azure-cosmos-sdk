@@ -708,12 +708,30 @@ export class AzureCosmosSdk implements INodeType {
 			const oauthTokenData = entraIdCredentials.oauthTokenData as any;
 			const refreshBeforeExpirySeconds = (entraIdCredentials.refreshBeforeExpirySeconds as number) || 900;
 
+			// Decode JWT to get actual expiry time (without signature validation)
+			let expiresAt = 0;
+			try {
+				const accessToken = oauthTokenData.access_token as string;
+				// JWT format: header.payload.signature
+				const parts = accessToken.split('.');
+				if (parts.length === 3) {
+					// Decode the payload (base64url)
+					const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString());
+					// JWT exp is in seconds since epoch
+					expiresAt = payload.exp ? payload.exp * 1000 : 0;
+					this.logger.debug(`JWT decoded: expires at ${new Date(expiresAt).toISOString()}`);
+				}
+			} catch (error) {
+				// Fallback to oauthTokenData.expires_at if JWT decode fails
+				expiresAt = oauthTokenData.expires_at ? new Date(oauthTokenData.expires_at).getTime() : 0;
+				this.logger.debug('JWT decode failed, using oauthTokenData.expires_at');
+			}
+
 			// Check if token needs refresh based on buffer
-			const expiresAt = oauthTokenData.expires_at ? new Date(oauthTokenData.expires_at).getTime() : 0;
 			const now = Date.now();
 			const timeUntilExpiry = (expiresAt - now) / 1000; // seconds
 
-			if (timeUntilExpiry < refreshBeforeExpirySeconds) {
+			if (timeUntilExpiry > 0 && timeUntilExpiry < refreshBeforeExpirySeconds) {
 				// Token will expire soon, trigger refresh by making a lightweight API call
 				// This will cause n8n's OAuth2 mechanism to refresh the token if it's expired
 				this.logger.info(`Token expires in ${Math.floor(timeUntilExpiry / 60)} minutes, refreshing...`);
@@ -735,7 +753,7 @@ export class AzureCosmosSdk implements INodeType {
 				} catch (error) {
 					this.logger.warn('Token refresh attempt failed, continuing with existing token');
 				}
-			} else {
+			} else if (timeUntilExpiry > 0) {
 				this.logger.info(`✓ Token still valid, expires in ${Math.floor(timeUntilExpiry / 60)} minutes`);
 			}
 

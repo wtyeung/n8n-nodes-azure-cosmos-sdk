@@ -853,10 +853,23 @@ class AzureCosmosSdk {
             const endpoint = entraIdCredentials.endpoint;
             const oauthTokenData = entraIdCredentials.oauthTokenData;
             const refreshBeforeExpirySeconds = entraIdCredentials.refreshBeforeExpirySeconds || 900;
-            const expiresAt = oauthTokenData.expires_at ? new Date(oauthTokenData.expires_at).getTime() : 0;
+            let expiresAt = 0;
+            try {
+                const accessToken = oauthTokenData.access_token;
+                const parts = accessToken.split('.');
+                if (parts.length === 3) {
+                    const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString());
+                    expiresAt = payload.exp ? payload.exp * 1000 : 0;
+                    this.logger.debug(`JWT decoded: expires at ${new Date(expiresAt).toISOString()}`);
+                }
+            }
+            catch (error) {
+                expiresAt = oauthTokenData.expires_at ? new Date(oauthTokenData.expires_at).getTime() : 0;
+                this.logger.debug('JWT decode failed, using oauthTokenData.expires_at');
+            }
             const now = Date.now();
             const timeUntilExpiry = (expiresAt - now) / 1000;
-            if (timeUntilExpiry < refreshBeforeExpirySeconds) {
+            if (timeUntilExpiry > 0 && timeUntilExpiry < refreshBeforeExpirySeconds) {
                 this.logger.info(`Token expires in ${Math.floor(timeUntilExpiry / 60)} minutes, refreshing...`);
                 try {
                     await this.helpers.httpRequestWithAuthentication.call(this, 'azureCosmosSdkEntraIdApi', {
@@ -872,7 +885,7 @@ class AzureCosmosSdk {
                     this.logger.warn('Token refresh attempt failed, continuing with existing token');
                 }
             }
-            else {
+            else if (timeUntilExpiry > 0) {
                 this.logger.info(`✓ Token still valid, expires in ${Math.floor(timeUntilExpiry / 60)} minutes`);
             }
             const tokenCredential = {
