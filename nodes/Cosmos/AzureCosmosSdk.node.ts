@@ -11,6 +11,62 @@ import { NodeOperationError } from 'n8n-workflow';
 import { CosmosClient } from '@azure/cosmos';
 import type { TokenCredential } from '@azure/cosmos';
 
+// Helper function to check and refresh OAuth2 token proactively
+async function checkAndRefreshToken(
+	context: IExecuteFunctions | ILoadOptionsFunctions,
+	credentialName: string,
+	endpoint: string,
+	oauthTokenData: any,
+	refreshBeforeExpirySeconds: number,
+): Promise<void> {
+	// Decode JWT to get actual expiry time (without signature validation)
+	let expiresAt = 0;
+	try {
+		const accessToken = oauthTokenData.access_token as string;
+		// JWT format: header.payload.signature
+		const parts = accessToken.split('.');
+		if (parts.length === 3) {
+			// Decode the payload (base64url)
+			const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString());
+			// JWT exp is in seconds since epoch
+			expiresAt = payload.exp ? payload.exp * 1000 : 0;
+			context.logger.debug(`JWT decoded: expires at ${new Date(expiresAt).toISOString()}`);
+		}
+	} catch (error) {
+		// Fallback to oauthTokenData.expires_at if JWT decode fails
+		expiresAt = oauthTokenData.expires_at ? new Date(oauthTokenData.expires_at).getTime() : 0;
+		context.logger.debug('JWT decode failed, using oauthTokenData.expires_at');
+	}
+
+	// Check if token needs refresh based on buffer
+	const now = Date.now();
+	const timeUntilExpiry = (expiresAt - now) / 1000; // seconds
+
+	if (timeUntilExpiry > 0 && timeUntilExpiry < refreshBeforeExpirySeconds) {
+		// Token will expire soon, trigger refresh by making a lightweight API call
+		context.logger.info(`Token expires in ${Math.floor(timeUntilExpiry / 60)} minutes, refreshing...`);
+		try {
+			// Use Cosmos DB REST API to list databases (lightweight operation)
+			await context.helpers.httpRequestWithAuthentication.call(
+				context,
+				credentialName,
+				{
+					method: 'GET',
+					url: `${endpoint.replace(/\/$/, '')}/dbs`,
+					headers: {
+						'x-ms-version': '2018-12-31',
+					},
+				},
+			);
+			context.logger.info('✅ Token refreshed successfully via Cosmos DB API call');
+		} catch (error) {
+			context.logger.warn('Token refresh attempt failed, continuing with existing token');
+		}
+	} else if (timeUntilExpiry > 0) {
+		context.logger.info(`✓ Token still valid, expires in ${Math.floor(timeUntilExpiry / 60)} minutes`);
+	}
+}
+
 export class AzureCosmosSdk implements INodeType {
 	description: INodeTypeDescription = {
 		displayName: 'Azure Cosmos DB (SDK)',
@@ -708,54 +764,14 @@ export class AzureCosmosSdk implements INodeType {
 			const oauthTokenData = entraIdCredentials.oauthTokenData as any;
 			const refreshBeforeExpirySeconds = (entraIdCredentials.refreshBeforeExpirySeconds as number) || 900;
 
-			// Decode JWT to get actual expiry time (without signature validation)
-			let expiresAt = 0;
-			try {
-				const accessToken = oauthTokenData.access_token as string;
-				// JWT format: header.payload.signature
-				const parts = accessToken.split('.');
-				if (parts.length === 3) {
-					// Decode the payload (base64url)
-					const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString());
-					// JWT exp is in seconds since epoch
-					expiresAt = payload.exp ? payload.exp * 1000 : 0;
-					this.logger.debug(`JWT decoded: expires at ${new Date(expiresAt).toISOString()}`);
-				}
-			} catch (error) {
-				// Fallback to oauthTokenData.expires_at if JWT decode fails
-				expiresAt = oauthTokenData.expires_at ? new Date(oauthTokenData.expires_at).getTime() : 0;
-				this.logger.debug('JWT decode failed, using oauthTokenData.expires_at');
-			}
-
-			// Check if token needs refresh based on buffer
-			const now = Date.now();
-			const timeUntilExpiry = (expiresAt - now) / 1000; // seconds
-
-			if (timeUntilExpiry > 0 && timeUntilExpiry < refreshBeforeExpirySeconds) {
-				// Token will expire soon, trigger refresh by making a lightweight API call
-				// This will cause n8n's OAuth2 mechanism to refresh the token if it's expired
-				this.logger.info(`Token expires in ${Math.floor(timeUntilExpiry / 60)} minutes, refreshing...`);
-				try {
-					// Use Cosmos DB REST API to list databases (lightweight operation)
-					// This endpoint will return 401 if token is expired, triggering n8n's auto-refresh
-					await this.helpers.httpRequestWithAuthentication.call(
-						this,
-						'azureCosmosSdkEntraIdApi',
-						{
-							method: 'GET',
-							url: `${endpoint.replace(/\/$/, '')}/dbs`,
-							headers: {
-								'x-ms-version': '2018-12-31',
-							},
-						},
-					);
-					this.logger.info('✅ Token refreshed successfully via Cosmos DB API call');
-				} catch (error) {
-					this.logger.warn('Token refresh attempt failed, continuing with existing token');
-				}
-			} else if (timeUntilExpiry > 0) {
-				this.logger.info(`✓ Token still valid, expires in ${Math.floor(timeUntilExpiry / 60)} minutes`);
-			}
+			// Check and refresh token proactively if needed
+			await checkAndRefreshToken(
+				this,
+				'azureCosmosSdkEntraIdApi',
+				endpoint,
+				oauthTokenData,
+				refreshBeforeExpirySeconds,
+			);
 
 			// Create a custom TokenCredential using the delegated OAuth token
 			const tokenCredential: TokenCredential = {
@@ -764,7 +780,9 @@ export class AzureCosmosSdk implements INodeType {
 					// n8n handles token refresh automatically via the microsoftOAuth2Api credential
 					return {
 						token: oauthTokenData.access_token,
-						expiresOnTimestamp: expiresAt || Date.now() + (3600 * 1000),
+						expiresOnTimestamp: oauthTokenData.expires_at 
+							? new Date(oauthTokenData.expires_at).getTime() 
+							: Date.now() + (3600 * 1000),
 					};
 				},
 			};
@@ -1308,10 +1326,20 @@ export class AzureCosmosSdk implements INodeType {
 						const credentials = await this.getCredentials('azureCosmosSdkEntraIdApi');
 						const endpoint = credentials.endpoint as string;
 						const oauthTokenData = credentials.oauthTokenData as any;
+						const refreshBeforeExpirySeconds = (credentials.refreshBeforeExpirySeconds as number) || 900;
 
 						if (!oauthTokenData?.access_token) {
 							throw new Error('No valid access token available. Please re-authenticate.');
 						}
+
+						// Check and refresh token proactively if needed
+						await checkAndRefreshToken(
+							this,
+							'azureCosmosSdkEntraIdApi',
+							endpoint,
+							oauthTokenData,
+							refreshBeforeExpirySeconds,
+						);
 
 						const tokenCredential: TokenCredential = {
 							getToken: async () => ({
@@ -1369,10 +1397,20 @@ export class AzureCosmosSdk implements INodeType {
 						const credentials = await this.getCredentials('azureCosmosSdkEntraIdApi');
 						const endpoint = credentials.endpoint as string;
 						const oauthTokenData = credentials.oauthTokenData as any;
+						const refreshBeforeExpirySeconds = (credentials.refreshBeforeExpirySeconds as number) || 900;
 
 						if (!oauthTokenData?.access_token) {
 							throw new Error('No valid access token available. Please re-authenticate.');
 						}
+
+						// Check and refresh token proactively if needed
+						await checkAndRefreshToken(
+							this,
+							'azureCosmosSdkEntraIdApi',
+							endpoint,
+							oauthTokenData,
+							refreshBeforeExpirySeconds,
+						);
 
 						const tokenCredential: TokenCredential = {
 							getToken: async () => ({
@@ -1440,10 +1478,20 @@ export class AzureCosmosSdk implements INodeType {
 						const credentials = await this.getCredentials('azureCosmosSdkEntraIdApi');
 						const endpoint = credentials.endpoint as string;
 						const oauthTokenData = credentials.oauthTokenData as any;
+						const refreshBeforeExpirySeconds = (credentials.refreshBeforeExpirySeconds as number) || 900;
 
 						if (!oauthTokenData?.access_token) {
 							throw new Error('No valid access token available. Please re-authenticate.');
 						}
+
+						// Check and refresh token proactively if needed
+						await checkAndRefreshToken(
+							this,
+							'azureCosmosSdkEntraIdApi',
+							endpoint,
+							oauthTokenData,
+							refreshBeforeExpirySeconds,
+						);
 
 						const tokenCredential: TokenCredential = {
 							getToken: async () => ({

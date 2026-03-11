@@ -3,6 +3,43 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.AzureCosmosSdk = void 0;
 const n8n_workflow_1 = require("n8n-workflow");
 const cosmos_1 = require("@azure/cosmos");
+async function checkAndRefreshToken(context, credentialName, endpoint, oauthTokenData, refreshBeforeExpirySeconds) {
+    let expiresAt = 0;
+    try {
+        const accessToken = oauthTokenData.access_token;
+        const parts = accessToken.split('.');
+        if (parts.length === 3) {
+            const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString());
+            expiresAt = payload.exp ? payload.exp * 1000 : 0;
+            context.logger.debug(`JWT decoded: expires at ${new Date(expiresAt).toISOString()}`);
+        }
+    }
+    catch (error) {
+        expiresAt = oauthTokenData.expires_at ? new Date(oauthTokenData.expires_at).getTime() : 0;
+        context.logger.debug('JWT decode failed, using oauthTokenData.expires_at');
+    }
+    const now = Date.now();
+    const timeUntilExpiry = (expiresAt - now) / 1000;
+    if (timeUntilExpiry > 0 && timeUntilExpiry < refreshBeforeExpirySeconds) {
+        context.logger.info(`Token expires in ${Math.floor(timeUntilExpiry / 60)} minutes, refreshing...`);
+        try {
+            await context.helpers.httpRequestWithAuthentication.call(context, credentialName, {
+                method: 'GET',
+                url: `${endpoint.replace(/\/$/, '')}/dbs`,
+                headers: {
+                    'x-ms-version': '2018-12-31',
+                },
+            });
+            context.logger.info('✅ Token refreshed successfully via Cosmos DB API call');
+        }
+        catch (error) {
+            context.logger.warn('Token refresh attempt failed, continuing with existing token');
+        }
+    }
+    else if (timeUntilExpiry > 0) {
+        context.logger.info(`✓ Token still valid, expires in ${Math.floor(timeUntilExpiry / 60)} minutes`);
+    }
+}
 class AzureCosmosSdk {
     constructor() {
         this.description = {
@@ -695,9 +732,11 @@ class AzureCosmosSdk {
                             const credentials = await this.getCredentials('azureCosmosSdkEntraIdApi');
                             const endpoint = credentials.endpoint;
                             const oauthTokenData = credentials.oauthTokenData;
+                            const refreshBeforeExpirySeconds = credentials.refreshBeforeExpirySeconds || 900;
                             if (!oauthTokenData?.access_token) {
                                 throw new Error('No valid access token available. Please re-authenticate.');
                             }
+                            await checkAndRefreshToken(this, 'azureCosmosSdkEntraIdApi', endpoint, oauthTokenData, refreshBeforeExpirySeconds);
                             const tokenCredential = {
                                 getToken: async () => ({
                                     token: oauthTokenData.access_token,
@@ -742,9 +781,11 @@ class AzureCosmosSdk {
                             const credentials = await this.getCredentials('azureCosmosSdkEntraIdApi');
                             const endpoint = credentials.endpoint;
                             const oauthTokenData = credentials.oauthTokenData;
+                            const refreshBeforeExpirySeconds = credentials.refreshBeforeExpirySeconds || 900;
                             if (!oauthTokenData?.access_token) {
                                 throw new Error('No valid access token available. Please re-authenticate.');
                             }
+                            await checkAndRefreshToken(this, 'azureCosmosSdkEntraIdApi', endpoint, oauthTokenData, refreshBeforeExpirySeconds);
                             const tokenCredential = {
                                 getToken: async () => ({
                                     token: oauthTokenData.access_token,
@@ -795,9 +836,11 @@ class AzureCosmosSdk {
                             const credentials = await this.getCredentials('azureCosmosSdkEntraIdApi');
                             const endpoint = credentials.endpoint;
                             const oauthTokenData = credentials.oauthTokenData;
+                            const refreshBeforeExpirySeconds = credentials.refreshBeforeExpirySeconds || 900;
                             if (!oauthTokenData?.access_token) {
                                 throw new Error('No valid access token available. Please re-authenticate.');
                             }
+                            await checkAndRefreshToken(this, 'azureCosmosSdkEntraIdApi', endpoint, oauthTokenData, refreshBeforeExpirySeconds);
                             const tokenCredential = {
                                 getToken: async () => ({
                                     token: oauthTokenData.access_token,
@@ -853,46 +896,14 @@ class AzureCosmosSdk {
             const endpoint = entraIdCredentials.endpoint;
             const oauthTokenData = entraIdCredentials.oauthTokenData;
             const refreshBeforeExpirySeconds = entraIdCredentials.refreshBeforeExpirySeconds || 900;
-            let expiresAt = 0;
-            try {
-                const accessToken = oauthTokenData.access_token;
-                const parts = accessToken.split('.');
-                if (parts.length === 3) {
-                    const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString());
-                    expiresAt = payload.exp ? payload.exp * 1000 : 0;
-                    this.logger.debug(`JWT decoded: expires at ${new Date(expiresAt).toISOString()}`);
-                }
-            }
-            catch (error) {
-                expiresAt = oauthTokenData.expires_at ? new Date(oauthTokenData.expires_at).getTime() : 0;
-                this.logger.debug('JWT decode failed, using oauthTokenData.expires_at');
-            }
-            const now = Date.now();
-            const timeUntilExpiry = (expiresAt - now) / 1000;
-            if (timeUntilExpiry > 0 && timeUntilExpiry < refreshBeforeExpirySeconds) {
-                this.logger.info(`Token expires in ${Math.floor(timeUntilExpiry / 60)} minutes, refreshing...`);
-                try {
-                    await this.helpers.httpRequestWithAuthentication.call(this, 'azureCosmosSdkEntraIdApi', {
-                        method: 'GET',
-                        url: `${endpoint.replace(/\/$/, '')}/dbs`,
-                        headers: {
-                            'x-ms-version': '2018-12-31',
-                        },
-                    });
-                    this.logger.info('✅ Token refreshed successfully via Cosmos DB API call');
-                }
-                catch (error) {
-                    this.logger.warn('Token refresh attempt failed, continuing with existing token');
-                }
-            }
-            else if (timeUntilExpiry > 0) {
-                this.logger.info(`✓ Token still valid, expires in ${Math.floor(timeUntilExpiry / 60)} minutes`);
-            }
+            await checkAndRefreshToken(this, 'azureCosmosSdkEntraIdApi', endpoint, oauthTokenData, refreshBeforeExpirySeconds);
             const tokenCredential = {
                 async getToken() {
                     return {
                         token: oauthTokenData.access_token,
-                        expiresOnTimestamp: expiresAt || Date.now() + (3600 * 1000),
+                        expiresOnTimestamp: oauthTokenData.expires_at
+                            ? new Date(oauthTokenData.expires_at).getTime()
+                            : Date.now() + (3600 * 1000),
                     };
                 },
             };
